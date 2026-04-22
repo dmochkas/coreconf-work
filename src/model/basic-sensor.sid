@@ -1,0 +1,170 @@
+{
+  "ietf-sid-file:sid-file": {
+    "module-name": "basic-sensor",
+    "sid-file-status": "unpublished",
+    "assignment-range": [
+      {
+        "entry-point": "60000",
+        "size": "500"
+      }
+    ],
+    "item": [
+      {
+        "namespace": "module",
+        "identifier": "basic-sensor",
+        "status": "unstable",
+        "sid": "60000"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:characteristics",
+        "status": "unstable",
+        "sid": "60001"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:characteristics/identifier",
+        "status": "unstable",
+        "sid": "60002",
+        "type": "string"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:characteristics/name",
+        "status": "unstable",
+        "sid": "60003",
+        "type": "string"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:characteristics/version",
+        "status": "unstable",
+        "sid": "60004",
+        "type": "string"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:read-sensor",
+        "status": "unstable",
+        "sid": "60005"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:read-sensor/input",
+        "status": "unstable",
+        "sid": "60006"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:read-sensor/input/id",
+        "status": "unstable",
+        "sid": "60007",
+        "type": "uint8"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:read-sensor/input/type",
+        "status": "unstable",
+        "sid": "60008",
+        "type": "string"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:read-sensor/output",
+        "status": "unstable",
+        "sid": "60009"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:read-sensor/output/quantity",
+        "status": "unstable",
+        "sid": "60010",
+        "type": "uint32"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors",
+        "status": "unstable",
+        "sid": "60011"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors/sensor",
+        "status": "unstable",
+        "sid": "60012"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors/sensor/enabled",
+        "status": "unstable",
+        "sid": "60013",
+        "type": "boolean"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors/sensor/id",
+        "status": "unstable",
+        "sid": "60014",
+        "type": "uint8"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors/sensor/quantity",
+        "status": "unstable",
+        "sid": "60015"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors/sensor/quantity/value",
+        "status": "unstable",
+        "sid": "60016",
+        "type": "int64"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors/sensor/read-sensor",
+        "status": "unstable",
+        "sid": "60017"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors/sensor/read-sensor/input",
+        "status": "unstable",
+        "sid": "60018"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors/sensor/read-sensor/output",
+        "status": "unstable",
+        "sid": "60019"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors/sensor/timestamp",
+        "status": "unstable",
+        "sid": "60020",
+        "type": "uint64"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors/sensor/type",
+        "status": "unstable",
+        "sid": "60021",
+        "type": "string"
+      },
+      {
+        "namespace": "data",
+        "identifier": "/basic-sensor:sensors/sensor/unit",
+        "status": "unstable",
+        "sid": "60022",
+        "type": "string"
+      }
+    ],
+    "key-mapping": {
+      "60012": [
+        60021,
+        60014
+      ]
+    }
+  }
+}
