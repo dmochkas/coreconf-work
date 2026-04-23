@@ -90,7 +90,7 @@ def main():
 
   # Title
   print("=" * 60)
-  print("CORECONF implementation of RPN calculator")
+  print("CORECONF implementation of basic sensor network")
   print("=" * 60)
 
   # Load SID file to pycoreconf model
