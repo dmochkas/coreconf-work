@@ -24,7 +24,7 @@ class CoAPClient(CoAPBase):
   async def init(self):
     logger.info(f"[CoAPClient.init] Initializing CoAP client instance...")
 
-    # Attempt to create CORECONF model.
+    # Attempt to create CORECONF model
     try:
       self.model = pycoreconf.CORECONFModel(self.sid_file)
     except Exception as e:
@@ -32,7 +32,7 @@ class CoAPClient(CoAPBase):
       sys.exit(1)
     logger.info(f"[CoAPClient.init] Created CORECONF model for SID file {self.sid_file}")
 
-    # Create client context for requests.
+    # Create client context for requests
     self.protocol = await aiocoap.Context.create_client_context()
 
     # Get module SID for module-wide datastore request
@@ -48,35 +48,37 @@ class CoAPClient(CoAPBase):
       logger.error("[CoAPClient.init] Failed to obtain datamodel response.")
       logger.exception(e)
 
+    # Printing response data
     logger.info(f"[CoAPClient.init] Datamodel response obtained!")
     logger.info(f"[CoAPClient.init] Payload: {response.payload.hex()}")
     logger.info(f"[CoAPClient.init] Payload size: {len(response.payload)} bytes")
 
+    # Concatenating response into a single dict
     full_response = {}
-    cbor_instance_list = cbor.loads(response.payload)
+    cbor_instance_list = cbor.loads(response.payload) # Loading full response into CBOR string
+    # Response SHOULD be list of yang-instances, as per draft-ietf-core-comi-21
     for i, cbor_instance in enumerate(cbor_instance_list):
       logger.info(f"[CoAPClient.init] Decoding payload instance {i}!")
-      instance = json.loads(self.model.toJSON(cbor_instance))
-      pprint.pprint(instance)
-      full_response |= instance
+      # pprint.pprint(instance)
+      full_response |= cbor_instance # Concatenating to full_response dict
 
     logger.info(f"[CoAPClient.init] Full datamodel response obtained. Printing.")
     pprint.pprint(full_response)
 
-    cbor_response = self.model.toCORECONF(json.dumps(full_response))
+    # Turning into CORECONF string (CBOR encoding with SIDs)
+    # cbor_response = self.model.toCORECONF(json.dumps(full_response))
 
+    # Attempt to load datastore with CORECONF string from response
     try:
-      self.ds = self.model.create_datastore(cbor_response)
+      self.ds = self.model.create_datastore(full_response)
     except Exception as e:
       logger.error("[CoAPClient.init] Failed to create datastore from response. Possible bad response!")
       logger.exception(e)
       sys.exit(1)
 
     logger.info("[CoAPClient.init] Initialized client with datastore!")
-
     logger.info("[CoAPClient.init] Printing full datastore for verification...")
-    pprint.pprint(self.ds)
-
+    pprint.pprint(json.loads(self.ds.to_json()))
     logger.info("[CoAPClient.init] Client fully initialized!")
 
   def _remote(self) -> str:
@@ -105,12 +107,19 @@ class CoAPClient(CoAPBase):
     return req
 
   async def FETCH(self, xpath: str, payload):
+    """
+    Performs a CORECONF FETCH operation on specified XPath with specified payload object.
+    Converts payload to CBOR encoded SID string before sending request.
+    """
+
     logger.info(f"[CoAPClient.FETCH] Attempting to FETCH path {payload} in resource </{xpath}>")
 
+    # Dumps payload into CBOR string
     cbor_payload = cbor.dumps(payload)
     logger.info(f"[CoAPClient.FETCH] Payload: {cbor_payload.hex()}")
     logger.info(f"[CoAPClient.FETCH] Payload size: {len(cbor_payload)}")
 
+    # Create request from XPath and CBOR payload
     request = self._request(xpath, cbor_payload)
     try:
       response = await asyncio.wait_for(self.protocol.request(request).response, timeout=5.0)
@@ -118,6 +127,7 @@ class CoAPClient(CoAPBase):
       logger.error("[CoAPClient.FETCH] Failed to obtain FETCH response.")
       raise e
 
+    # Return response
     if response:
       logger.info("[CoAPClient.FETCH] Response obtained!")
     return response
@@ -125,6 +135,25 @@ class CoAPClient(CoAPBase):
 async def main():
   client = CoAPClient(CoAPBase.host, CoAPBase.port)
   await client.init()
+
+  while (payload := input("Insert XPath: ")) != "exit":
+
+    target_sid, keys = client.ds._resolve_path(payload)
+    if keys:
+      instance = [target_sid] + keys
+    else:
+      instance = target_sid
+
+    logger.info(f"Attempting to send FETCH with payload {instance}")
+
+    try:
+      response = await client.FETCH("c", [instance])
+    except Exception as e:
+      logger.exception(e)
+
+    cbor_payload = cbor.loads(response.payload)
+    for i, data in enumerate(cbor_payload):
+      pprint.pprint(data)
 
 if __name__=="__main__":
   asyncio.run(main())

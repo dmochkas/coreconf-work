@@ -84,12 +84,19 @@ class DatastoreResource(resource.Resource):
 
     response = []
     for i, instance in enumerate(payload):
+      logger.info(f"[DatastoreResource.render_fetch] Instance {i} is of type {type(instance)}")
+
       # If instance is only SID
-      if not isinstance(instance, (list, tuple)):
+      if not isinstance(instance, list):
         xpath = CoAPServer.datastore._create_xpath(instance)
+        sid = instance
       # If instance is SID and keys
       elif len(instance) > 1:
         xpath = CoAPServer.datastore._create_xpath(instance[0], keys=instance[1:])
+        sid = instance[0]
+
+      return_xpath = f"{CoAPServer.module_name}:{CoAPServer.datastore._create_xpath(sid)[1:]}"
+      logger.info(f"[DatastoreResource.render_fetch] Payload instance {i} has keyless XPath {return_xpath}")
       
       full_xpath = f"{CoAPServer.module_name}:{xpath[1:]}"
       logger.info(f"[DatastoreResource.render_fetch] Payload instance {i} has XPath {full_xpath}")
@@ -98,12 +105,14 @@ class DatastoreResource(resource.Resource):
       logger.info(f"[DatastoreResource.render_fetch] Obtained response for instance {i}. Printing.")
       pprint.pprint(instance_response)
 
-      json_instance_response = json.dumps({full_xpath: instance_response})
-      logger.info(f"[DatastoreResource.render_fetch] Generated JSON instance response for instance {i}. Printing.")
+      json_instance_response = {return_xpath: instance_response}
+      logger.info(f"[DatastoreResource.render_fetch] Generated JSON object instance response for instance {i}. Printing.")
       pprint.pprint(json_instance_response)
       
       cbor_instance_response = CoAPServer.model.toCORECONF(json_instance_response)
-      response.append(cbor_instance_response)
+      logger.info(f"[DatastoreResource.render_fetch] Created CORECONF string from JSON object. Printing.")
+      pprint.pprint(cbor.loads(cbor_instance_response))
+      response.append(cbor.loads(cbor_instance_response))
 
     cbor_response = cbor.dumps(response)
     logger.info(f"[DatastoreResource.render_fetch] Full response obtained. Printing.")
