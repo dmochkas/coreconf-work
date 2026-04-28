@@ -77,6 +77,39 @@ class DatastoreResource(resource.Resource):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
+  def extractDataNode(self, instance: int|list[int|str]) -> dict:
+    logger.info(f"[DatastoreResource.extractDataNode] Instance is of type {type(instance)}")
+
+    # If instance is only SID, simply get XPath
+    if isinstance(instance, int):
+      sid = instance
+      xpath = CoAPServer.module_name + ':' + CoAPServer.datastore._create_xpath(sid)[1:]
+      return_xpath = xpath
+    elif isinstance(instance, list):
+      sid = instance[0]
+      xpath = CoAPServer.module_name + ':' + CoAPServer.datastore._create_xpath(sid, keys=instance[1:])[1:]
+      return_xpath = CoAPServer.module_name + ':' + CoAPServer.datastore._create_xpath(sid)[1:]
+    else:
+      logger.error("[DatastoreResource.extractDataNode] Instance is bad type!")
+      raise TypeError("Bad instance type")
+
+    logger.info(f"[DatastoreResource.extractDataNode] Payload instance has keyless XPath {return_xpath}")
+    logger.info(f"[DatastoreResource.extractDataNode] Payload instance has XPath {xpath}")
+
+    instance_response = CoAPServer.datastore[xpath]
+    logger.info(f"[DatastoreResource.extractDataNode] Obtained response for instance. Printing.")
+    pprint.pprint(instance_response, indent=4)
+
+    json_instance_response = {return_xpath: instance_response}
+    logger.info(f"[DatastoreResource.extractDataNode] Generated JSON object instance response for instance. Printing.")
+    pprint.pprint(json_instance_response, indent=4)
+    
+    cbor_instance_response = CoAPServer.model.toCORECONF(json_instance_response)
+    logger.info(f"[DatastoreResource.extractDataNode] Created CORECONF string from JSON object. Printing.")
+    pprint.pprint(cbor.loads(cbor_instance_response), indent=4)
+    
+    return cbor_instance_response
+
   async def render_fetch(self, request: aiocoap.Message) -> aiocoap.Message:
     logger.info(f"[DatastoreResource.render_fetch] FETCH request from client {request.remote}")
     payload = cbor.loads(request.payload)
@@ -84,34 +117,8 @@ class DatastoreResource(resource.Resource):
 
     response = []
     for i, instance in enumerate(payload):
-      logger.info(f"[DatastoreResource.render_fetch] Instance {i} is of type {type(instance)}")
-
-      # If instance is only SID
-      if not isinstance(instance, list):
-        xpath = CoAPServer.datastore._create_xpath(instance)
-        sid = instance
-      # If instance is SID and keys
-      elif len(instance) > 1:
-        xpath = CoAPServer.datastore._create_xpath(instance[0], keys=instance[1:])
-        sid = instance[0]
-
-      return_xpath = f"{CoAPServer.module_name}:{CoAPServer.datastore._create_xpath(sid)[1:]}"
-      logger.info(f"[DatastoreResource.render_fetch] Payload instance {i} has keyless XPath {return_xpath}")
-      
-      full_xpath = f"{CoAPServer.module_name}:{xpath[1:]}"
-      logger.info(f"[DatastoreResource.render_fetch] Payload instance {i} has XPath {full_xpath}")
-
-      instance_response = CoAPServer.datastore[xpath]
-      logger.info(f"[DatastoreResource.render_fetch] Obtained response for instance {i}. Printing.")
-      pprint.pprint(instance_response)
-
-      json_instance_response = {return_xpath: instance_response}
-      logger.info(f"[DatastoreResource.render_fetch] Generated JSON object instance response for instance {i}. Printing.")
-      pprint.pprint(json_instance_response)
-      
-      cbor_instance_response = CoAPServer.model.toCORECONF(json_instance_response)
-      logger.info(f"[DatastoreResource.render_fetch] Created CORECONF string from JSON object. Printing.")
-      pprint.pprint(cbor.loads(cbor_instance_response))
+      logger.info(f"[DatastoreResource.render_fetch] Extracting instance {i}.")
+      cbor_instance_response = self.extractDataNode(instance)
       response.append(cbor.loads(cbor_instance_response))
 
     cbor_response = cbor.dumps(response)

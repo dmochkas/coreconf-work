@@ -65,9 +65,6 @@ class CoAPClient(CoAPBase):
     logger.info(f"[CoAPClient.init] Full datamodel response obtained. Printing.")
     pprint.pprint(full_response)
 
-    # Turning into CORECONF string (CBOR encoding with SIDs)
-    # cbor_response = self.model.toCORECONF(json.dumps(full_response))
-
     # Attempt to load datastore with CORECONF string from response
     try:
       self.ds = self.model.create_datastore(full_response)
@@ -106,10 +103,12 @@ class CoAPClient(CoAPBase):
     
     return req
 
-  async def FETCH(self, xpath: str, payload):
+  async def FETCH(self, xpath: str, payload: int|list[int|str]):
     """
     Performs a CORECONF FETCH operation on specified XPath with specified payload object.
     Converts payload to CBOR encoded SID string before sending request.
+
+    FETCH operation will get the data nodes corresponding to one or more SIDs, which are present in the payload.
     """
 
     logger.info(f"[CoAPClient.FETCH] Attempting to FETCH path {payload} in resource </{xpath}>")
@@ -151,9 +150,10 @@ async def main():
     except Exception as e:
       logger.exception(e)
 
-    cbor_payload = cbor.loads(response.payload)
-    for i, data in enumerate(cbor_payload):
-      pprint.pprint(data)
+    pprint.pprint(response.payload)
+
+    cbor_payload = client.model.toJSON(response.payload)
+    pprint.pprint(cbor_payload)
 
 if __name__=="__main__":
   asyncio.run(main())
