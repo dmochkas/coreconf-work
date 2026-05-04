@@ -12,7 +12,7 @@ from base import CoAPBase
 
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class CoAPClient(CoAPBase):
@@ -22,7 +22,7 @@ class CoAPClient(CoAPBase):
     self.protocol = None
 
   async def init(self):
-    logger.info(f"[CoAPClient.init] Initializing CoAP client instance...")
+    logger.debug(f"[CoAPClient.init] Initializing CoAP client instance...")
 
     # Attempt to create CORECONF model
     try:
@@ -30,7 +30,7 @@ class CoAPClient(CoAPBase):
     except Exception as e:
       logger.exception(e)
       sys.exit(1)
-    logger.info(f"[CoAPClient.init] Created CORECONF model for SID file {self.sid_file}")
+    logger.debug(f"[CoAPClient.init] Created CORECONF model for SID file {self.sid_file}")
 
     # Create client context for requests
     self.protocol = await aiocoap.Context.create_client_context()
@@ -41,7 +41,7 @@ class CoAPClient(CoAPBase):
     target_sids = [target_sid_1, target_sid_2]
 
     # Request full datastore
-    logger.info(f"[CoAPClient.init] FETCHing all sub-leafs from SIDs {target_sids}")
+    logger.debug(f"[CoAPClient.init] FETCHing all sub-leafs from SIDs {target_sids}")
     try:
       response = await self.FETCH("c?d=0", target_sids)
     except TimeoutError as e:
@@ -49,20 +49,20 @@ class CoAPClient(CoAPBase):
       logger.exception(e)
 
     # Printing response data
-    logger.info(f"[CoAPClient.init] Datamodel response obtained!")
-    logger.info(f"[CoAPClient.init] Payload: {response.payload.hex()}")
-    logger.info(f"[CoAPClient.init] Payload size: {len(response.payload)} bytes")
+    logger.debug(f"[CoAPClient.init] Datamodel response obtained!")
+    logger.debug(f"[CoAPClient.init] Payload: {response.payload.hex()}")
+    logger.debug(f"[CoAPClient.init] Payload size: {len(response.payload)} bytes")
 
     # Concatenating response into a single dict
     full_response = {}
     cbor_instance_list = cbor.loads(response.payload) # Loading full response into CBOR string
     # Response SHOULD be list of yang-instances, as per draft-ietf-core-comi-21
     for i, cbor_instance in enumerate(cbor_instance_list):
-      logger.info(f"[CoAPClient.init] Decoding payload instance {i}!")
+      logger.debug(f"[CoAPClient.init] Decoding payload instance {i}!")
       # pprint.pprint(instance)
       full_response |= cbor_instance # Concatenating to full_response dict
 
-    logger.info(f"[CoAPClient.init] Full datamodel response obtained. Printing.")
+    logger.debug(f"[CoAPClient.init] Full datamodel response obtained. Printing.")
     pprint.pprint(full_response)
 
     # Attempt to load datastore with CORECONF string from response
@@ -76,7 +76,7 @@ class CoAPClient(CoAPBase):
     logger.info("[CoAPClient.init] Initialized client with datastore!")
     logger.info("[CoAPClient.init] Printing full datastore for verification...")
     pprint.pprint(json.loads(self.ds.to_json()))
-    logger.info("[CoAPClient.init] Client fully initialized!")
+    logger.debug("[CoAPClient.init] Client fully initialized!")
 
   def _remote(self) -> str:
     """
@@ -103,7 +103,7 @@ class CoAPClient(CoAPBase):
     
     return req
 
-  async def FETCH(self, xpath: str, payload: int|list[int|str]):
+  async def FETCH(self, xpath: str, payload: int|tuple):
     """
     Performs a CORECONF FETCH operation on specified XPath with specified payload object.
     Converts payload to CBOR encoded SID string before sending request.
@@ -111,12 +111,12 @@ class CoAPClient(CoAPBase):
     FETCH operation will get the data nodes corresponding to one or more SIDs, which are present in the payload.
     """
 
-    logger.info(f"[CoAPClient.FETCH] Attempting to FETCH path {payload} in resource </{xpath}>")
+    logger.debug(f"[CoAPClient.FETCH] Attempting to FETCH path {payload} in resource </{xpath}>")
 
     # Dumps payload into CBOR string
     cbor_payload = cbor.dumps(payload)
-    logger.info(f"[CoAPClient.FETCH] Payload: {cbor_payload.hex()}")
-    logger.info(f"[CoAPClient.FETCH] Payload size: {len(cbor_payload)}")
+    logger.debug(f"[CoAPClient.FETCH] Payload: {cbor_payload.hex()}")
+    logger.debug(f"[CoAPClient.FETCH] Payload size: {len(cbor_payload)} bytes")
 
     # Create request from XPath and CBOR payload
     request = self._request(xpath, cbor_payload)
@@ -128,32 +128,34 @@ class CoAPClient(CoAPBase):
 
     # Return response
     if response:
-      logger.info("[CoAPClient.FETCH] Response obtained!")
+      logger.debug("[CoAPClient.FETCH] Response obtained!")
     return response
 
-async def main():
-  client = CoAPClient(CoAPBase.host, CoAPBase.port)
-  await client.init()
+  async def iPATCH(self, xpath: str, payload):
+    """
+    Performs a CORECONF iPATCH operation on specified XPath with specified payload object.
+    Converts payload to CBOR encoded SID string before sending request.
 
-  while (payload := input("Insert XPath: ")) != "exit":
+    iPATCH operation will change, create or delete data corresponding to one or more SIDs, which are present in the payload.
+    """
+    
+    logger.debug(f"[CoAPClient.iPATCH] Attempting to iPATCH content in resousrce </{xpath}>")
+    pprint.pprint(payload, indent=4)
 
-    target_sid, keys = client.ds._resolve_path(payload)
-    if keys:
-      instance = [target_sid] + keys
-    else:
-      instance = target_sid
+    # Dumps payload into CBOR string
+    cbor_payload = cbor.dumps(payload)
+    logger.debug(f"CoAPClient.iPATCH] Payload: {cbor_payload.hex()}")
+    logger.debug(f"CoAPClient.iPATCH] Payload size: {len(cbor_payload)} bytes")
 
-    logger.info(f"Attempting to send FETCH with payload {instance}")
-
+    # Create iPATCH (Code 7) request from XPath and CBOR payload
+    request = self._request(xpath, cbor_payload)
+    request.code = aiocoap.iPATCH
     try:
-      response = await client.FETCH("c", [instance])
-    except Exception as e:
-      logger.exception(e)
-
-    pprint.pprint(response.payload)
-
-    cbor_payload = client.model.toJSON(response.payload)
-    pprint.pprint(cbor_payload)
-
-if __name__=="__main__":
-  asyncio.run(main())
+      response = await asyncio.wait_for(self.protocol.request(request).response, timeout=5.0)
+    except TimeoutError as e:
+      logger.error("CoAPClient.iPATCH Failed to obtain iPATCH response.")
+      raise e
+    
+    if response:
+      logger.debug("[CoAPClient.iPATCH] Response obtained!")
+    return response
