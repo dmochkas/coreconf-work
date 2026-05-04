@@ -25,7 +25,7 @@ async def main():
   input("Press Enter to continue...")
   print("="*100)
 
-  # DECIDE ON FETCH URI BELOW
+  # DECIDE ON iPATCH URI BELOW
   IPATCH_PATH = "/basic-sensor:sensors/sensor[type='temperature'][id='0']"
   IPATCH_CONTENT = None
 
