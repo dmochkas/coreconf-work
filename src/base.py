@@ -10,6 +10,6 @@ class CoAPBase:
   """
 
   host = "localhost"
-  port = 5863
+  port = 5683
   module_name = MODULE_NAME
   sid_file = SID_PATH
