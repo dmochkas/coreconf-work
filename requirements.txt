@@ -2,3 +2,4 @@ aiocoap
 cbor2
 pyang
 pycoreconf
+scapy
