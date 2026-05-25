@@ -1,3 +1,4 @@
+import aiocoap
 import socket
 from scapy.all import *
 
@@ -5,10 +6,22 @@ from base import CoAPBase
 from packet.coap_packet import *
 
 # Ping message
-message = raw(createCORECONFMessage(CoAPMsg.Reliability.ACK, CoAPMsg.MessageType.PING))
+message = aiocoap.Message(
+  mtype=aiocoap.ACK,
+  mid=0x1234,
+  code=aiocoap.Code.PONG
+)
+
+message_bytes = buildPacket(message)
 
 sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-sock.bind((CoAPBase.APP_IP, CoAPBase.PORT))
+
+try:
+  sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+except OSError:
+  pass
+
+sock.bind(('::', CoAPBase.PORT))
 
 print(f"Listening for CoAP packets on [{CoAPBase.APP_IP}]:{CoAPBase.PORT}...")
 
@@ -20,4 +33,4 @@ while True:
 
   if data:
     print(f"[+] Sending response ping to {addr}...")
-    sock.sendto(message, addr)
+    sock.sendto(message_bytes, addr)
