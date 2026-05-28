@@ -1,4 +1,5 @@
 import aiocoap
+import aiocoap.oscore as oscore
 import socket
 from scapy.all import *
 
@@ -9,10 +10,15 @@ from packet.coap_packet import *
 message = aiocoap.Message(
   mtype=aiocoap.ACK,
   mid=0x1234,
-  code=aiocoap.Code.PONG
+  code=aiocoap.Code.CHANGED
+)
+message.payload = b"Hello, User!"
+
+security_ctx = oscore.FilesystemSecurityContext(
+  "./src/context_app"
 )
 
-message_bytes = buildPacket(message)
+# message_bytes = buildPacket(message)
 
 sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
 
@@ -32,5 +38,16 @@ while True:
   print(f"[+]   Length: {len(data)}")
 
   if data:
-    print(f"[+] Sending response ping to {addr}...")
-    sock.sendto(message_bytes, addr)
+    print(f"[+] Decoding message from {addr}...")
+    
+    message_in = aiocoap.Message.decode(
+      data
+    )
+    message_unprotected, request_id = security_ctx.unprotect(message_in)
+    
+    print(f"[+] Payload: {message_unprotected.payload}")
+
+    print(f"[+] Sending response to {addr}...")
+    
+    response, _ = buildPacket(security_ctx, message, request_id=request_id)
+    sock.sendto(response, addr)

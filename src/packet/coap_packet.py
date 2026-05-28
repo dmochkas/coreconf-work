@@ -1,127 +1,97 @@
 import aiocoap
+import aiocoap.oscore
 from scapy.all import *
-from enum import Enum
 
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# oscore_algorithm = aiocoap.oscore.AES_CCM_16_64_128()
-# oscore_hashfun = aiocoap.oscore.hashfuncions["sha256"]
+oscore_algorithm = aiocoap.oscore.AES_CCM_16_64_128()
+oscore_hashfun = aiocoap.oscore.hashfunctions["sha256"]
 
-INNER_OPTIONS = [
-  aiocoap.OptionNumber.IF_MATCH,
-  aiocoap.OptionNumber.ETAG,
-  aiocoap.OptionNumber.IF_NONE_MATCH,
-  aiocoap.OptionNumber.OBSERVE,
-  aiocoap.OptionNumber.LOCATION_PATH,
-  aiocoap.OptionNumber.URI_PATH,
-  aiocoap.OptionNumber.CONTENT_FORMAT,
-  aiocoap.OptionNumber.MAX_AGE,
-  aiocoap.OptionNumber.URI_QUERY,
-  aiocoap.OptionNumber.ACCEPT,
-  aiocoap.OptionNumber.LOCATION_QUERY,
-  aiocoap.OptionNumber.BLOCK2,
-  aiocoap.OptionNumber.BLOCK1,
-  aiocoap.OptionNumber.SIZE2,
-  aiocoap.OptionNumber.SIZE1,
-  aiocoap.OptionNumber.NO_RESPONSE,
-]
-OUTER_OPTIONS = [
-  aiocoap.OptionNumber.URI_HOST,
-  aiocoap.OptionNumber.OBSERVE,
-  aiocoap.OptionNumber.URI_PORT,
-  aiocoap.OptionNumber.OSCORE,
-  aiocoap.OptionNumber.MAX_AGE,
-  aiocoap.OptionNumber.BLOCK2,
-  aiocoap.OptionNumber.BLOCK1,
-  aiocoap.OptionNumber.SIZE2,
-  aiocoap.OptionNumber.PROXY_URI,
-  aiocoap.OptionNumber.PROXY_SCHEME,
-  aiocoap.OptionNumber.SIZE1,
-  aiocoap.OptionNumber.NO_RESPONSE,
-]
+C1_KEY = bytes.fromhex("0102030405060708090a0b0c0d0e0f10")
+C1_SALT = bytes.fromhex("9e7ca92223786340")
 
-def buildPacket(message: aiocoap.Message) -> bytes:
+def buildPacket(
+      security_ctx: aiocoap.oscore.FilesystemSecurityContext, 
+      message: aiocoap.Message, 
+      sender_id=None, 
+      request_id: aiocoap.oscore.RequestIdentifiers|None=None
+    ) -> bytes:
+  """
+  `request_id` consists of additional data required to unprotect a protected message.
+  """
+
   # if not message.opt.get_option(aiocoap.OptionNumber.OSCORE):
   #   logger.error("No OSCORE. Returning message bytes.")
   #   return message.encode()
 
-  real_code = message.code
+  if sender_id is None:
+    sender_id = security_ctx.sender_id
 
-  if message.code.is_request(): # If request, POST w/o Observe and FETCH w/ Observe
-    dummy_code = aiocoap.Code.FETCH if message.opt.get_option(aiocoap.OptionNumber.OBSERVE) else aiocoap.Code.POST
-  elif message.code.is_response(): # If response, CHANGED w/o Observe and CONTENT w/ Observe
-    dummy_code = aiocoap.Code.CONTENT if message.opt.get_option(aiocoap.OptionNumber.OBSERVE) else aiocoap.Code.CHANGED
-  else: # If neither, use original
-    dummy_code = message.code
+  # Split messages
+  outer_msg, inner_msg = security_ctx._split_message(message, request_id)
 
-  # Create messages
-  outer_msg = aiocoap.Message(
-    mtype=message.mtype, 
-    mid=message.mid, 
-    code=dummy_code, 
-    token=message.token,
+  outer_msg.code = message.code
+  outer_msg.mid = message.mid
+  outer_msg.mtype = message.mtype
 
-    # Options
-    uri_port=message.opt.uri_port,
-    oscore=message.opt.oscore
+  # Prepare parameters
+  partial_iv_short = None
+  partial_iv_source = None
+  nonce = None
+
+  protected = {}
+  unprotected = {}
+
+  # Get partial IV from associated data if present
+  if request_id is not None:
+    partial_iv_source, partial_iv_short = request_id.get_reusable_kid_and_piv()
+  
+  # If no associated data, generate partial IV. Else, reconstruct nonce from partial IV with AES_CCM
+  if partial_iv_source is None:
+    nonce, partial_iv_short = security_ctx._build_new_nonce(oscore_algorithm)
+    partial_iv_source = sender_id
+    unprotected[6] = partial_iv_short
+  else:
+    nonce = security_ctx._construct_nonce(
+      partial_iv_short, partial_iv_source, oscore_algorithm
+    )
+  
+  # Get unprotected parameters
+  unprotected[4] = sender_id
+  if message.code.is_request():
+    request_id = aiocoap.oscore.RequestIdentifiers(
+      sender_id,
+      partial_iv_short,
+      can_reuse_nonce=None,
+      request_code=outer_msg.code
+    )
+  
+  # Extract option data
+  option_data, _ = security_ctx._compress(protected, unprotected, b"")
+  outer_msg.opt.oscore = option_data
+
+  # TODO Compress inner message using SCHC
+  compressed_inner_msg = inner_msg
+
+  # Encrypt compressed inner message
+  external_aad = security_ctx._extract_external_aad(
+    outer_msg, request_id, local_is_sender=True
   )
-  inner_msg = aiocoap.Message(
-    mtype=message.mtype, 
-    mid=0x0000, 
-    code=real_code, 
-    token=b"", 
-    payload=message.payload,
 
-    # Options
-    uri_path="c"
+  aad = aiocoap.oscore.SymmetricEncryptionAlgorithm._build_encrypt0_structure(
+    protected, external_aad
   )
 
-  # Check options
-  # logger.info("Checking message options...")
+  key = security_ctx._get_sender_key(outer_msg, external_aad, compressed_inner_msg, request_id)
 
-  # outer_msg.opt.uri_host = message.opt.get_option(aiocoap.OptionNumber.URI_HOST)
-  # outer_msg.opt.observe = message.opt.get_option(aiocoap.OptionNumber.OBSERVE)
-  # outer_msg.opt.uri_port = message.opt.uri_port
-  # outer_msg.opt.oscore = message.opt.oscore
-  # outer_msg.opt.max_age = message.opt.get_option(aiocoap.OptionNumber.MAX_AGE)
-  # outer_msg.opt.block2 = message.opt.get_option(aiocoap.OptionNumber.BLOCK2)
-  # outer_msg.opt.block1 = message.opt.get_option(aiocoap.OptionNumber.BLOCK1)
-  # outer_msg.opt.size2 = message.opt.get_option(aiocoap.OptionNumber.SIZE2)
-  # outer_msg.opt.proxy_uri = message.opt.get_option(aiocoap.OptionNumber.PROXY_URI)
-  # outer_msg.opt.proxy_scheme = message.opt.get_option(aiocoap.OptionNumber.PROXY_SCHEME)
-  # outer_msg.opt.size1 = message.opt.get_option(aiocoap.OptionNumber.SIZE1)
-  # outer_msg.opt.no_response = message.opt.get_option(aiocoap.OptionNumber.NO_RESPONSE)
+  ciphertext = security_ctx.algorithm.encrypt(compressed_inner_msg, aad, key, nonce)
+  _, protected_inner_msg = security_ctx._compress(protected, unprotected, ciphertext)
 
-  # inner_msg.opt.if_match = message.opt.get_option(aiocoap.OptionNumber.IF_MATCH)
-  # inner_msg.opt.etag = message.opt.get_option(aiocoap.OptionNumber.ETAG)
-  # inner_msg.opt.if_none_match = message.opt.get_option(aiocoap.OptionNumber.IF_NONE_MATCH)
-  # inner_msg.opt.observe = message.opt.get_option(aiocoap.OptionNumber.OBSERVE)
-  # inner_msg.opt.location_path = message.opt.get_option(aiocoap.OptionNumber.LOCATION_PATH)
-  # inner_msg.opt.uri_path = message.opt.uri_path
-  # inner_msg.opt.content_format = message.opt.get_option(aiocoap.OptionNumber.CONTENT_FORMAT)
-  # inner_msg.opt.max_age = message.opt.get_option(aiocoap.OptionNumber.MAX_AGE)
-  # inner_msg.opt.uri_query = message.opt.get_option(aiocoap.OptionNumber.URI_QUERY)
-  # inner_msg.opt.accept = message.opt.get_option(aiocoap.OptionNumber.ACCEPT)
-  # inner_msg.opt.location_query = message.opt.get_option(aiocoap.OptionNumber.LOCATION_QUERY)
-  # inner_msg.opt.block2 = message.opt.get_option(aiocoap.OptionNumber.BLOCK2)
-  # inner_msg.opt.block1 = message.opt.get_option(aiocoap.OptionNumber.BLOCK1)
-  # inner_msg.opt.size2 = message.opt.get_option(aiocoap.OptionNumber.SIZE2)
-  # inner_msg.opt.size1 = message.opt.get_option(aiocoap.OptionNumber.SIZE1)
-  # inner_msg.opt.no_response = message.opt.get_option(aiocoap.OptionNumber.NO_RESPONSE)
-
-  # logger.info("Finished options.")
-
-  # Trim inner message
-  inner_msg_bytes = inner_msg.encode()
-  inner_msg_bytes = bytes([inner_msg_bytes[1]]) + inner_msg_bytes[4:] # Trim inner message (remove first byte and MID)
-  logger.info(f"Inner message bytes: {inner_msg_bytes}")
-
-  # security_ctx = aiocoap.oscore.CanProtect()
-
-  outer_msg.payload = inner_msg_bytes
+  # 
+  outer_msg.payload = protected_inner_msg
 
   # Return scapy packet
-  return outer_msg.encode()
+  return outer_msg.encode(), request_id
