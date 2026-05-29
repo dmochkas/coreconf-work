@@ -1,0 +1,9 @@
+#ifndef DEFINITIONS_H
+#define DEFINITIONS_H
+
+#define COAP_PORT 5683
+#define CLIENT_PORT 25565
+
+#define BUFFER_MAX 4096
+
+#endif // DEFINITIONS_H

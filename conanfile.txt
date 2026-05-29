@@ -1,0 +1,6 @@
+[requires]
+libcoap
+
+[generators]
+CMakeToolchain
+CMakeDeps
