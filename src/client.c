@@ -8,10 +8,6 @@
 #include "definitions.h"
 #include "helpers/resolve.h"
 
-/* Defines */
-
-#define COAP_SERVER_URI "coap://coap.me/hello"
-
 /* Private variables */
 
 static uint8_t received_response = 0;
@@ -38,7 +34,7 @@ int main() {
     LIBCOAP_PACKAGE_VERSION
   );
 
-  const char *server_uri_str = COAP_SERVER_URI;
+  const char *resource_uri_str = "coap://[2001:660:7301:51:8b61:22c0:6d18:c74f]/hello";
   uint8_t dummy_buf[100];
   
   coap_startup();
@@ -48,6 +44,7 @@ int main() {
   coap_address_t client;
   coap_address_init(&client);
   memset(&client.addr.sin6, 0, sizeof(client.addr.sin6)); // Setting IPv6 socket in client
+  client.addr.sa.sa_family       = AF_INET6;
   client.addr.sin6.sin6_family   = AF_INET6;
   client.addr.sin6.sin6_port     = htons(COAP_PORT);
   client.addr.sin6.sin6_addr     = in6addr_any;
@@ -57,17 +54,14 @@ int main() {
   // Setup server address
   coap_address_t server;
   coap_address_init(&server);
+  coap_str_const_t *server_address = coap_make_str_const(COAP_SERVER_IP);
+  uint32_t scheme_hint_bits = coap_get_available_scheme_hint_bits(0, 0, COAP_PROTO_NONE);
 
-  coap_uri_t server_uri;
-  if (coap_split_uri((const unsigned char *)server_uri_str, strlen(server_uri_str), &server_uri) != 0) {
-    perror("Failed to parse URI.");
-    exit(1);
-  }
-
-  if (resolve_address(&server_uri.host, server_uri.port, &server, 1 << server_uri.scheme) > 0) {
+  if (resolve_address(server_address, COAP_PORT, &server, scheme_hint_bits) > 0) {
     perror("Failed to resolve server address.\n");
     exit(2);
   }
+  server.addr.sin6.sin6_port = htons(COAP_PORT);
 
   // Create CoAP context
   coap_context_t *ctx = coap_new_context(NULL);
@@ -98,7 +92,12 @@ int main() {
 
   // Create options list and add to message
   coap_optlist_t *optlist = NULL;
-  if (coap_uri_into_options(&server_uri, &server, &optlist, 1, dummy_buf, sizeof(dummy_buf))) {
+  coap_uri_t resource_uri;
+  if (coap_split_uri((const unsigned char *)resource_uri_str, strlen(resource_uri_str), &resource_uri) != 0) {
+    perror("Failed to parse URI.");
+    exit(5);
+  }
+  if (coap_uri_into_options(&resource_uri, &server, &optlist, 1, dummy_buf, sizeof(dummy_buf))) {
     perror("Failed to create options.");
     exit(6);
   }
@@ -110,7 +109,7 @@ int main() {
   coap_show_pdu(COAP_LOG_WARN, request);
 
   // Finally send message
-  if (coap_send(session, request) == COAP_INVALID_MID) {
+  if (coap_send(session, request) == COAP_INVALID_MID) { // I DO NOT KNOW WHY THIS DOES NOT WORK. FIND OUT UNTIL MONDAY EOD.
     perror("Failed to send CoAP request.\n");
     exit(8);
   }
