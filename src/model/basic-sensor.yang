@@ -1,0 +1,73 @@
+module basic-sensor {
+  yang-version 1.1;
+  namespace "urn:yang:basic-sensor";
+  prefix bsens;
+  
+  container characteristics {
+    leaf name {
+      type string;
+    }
+    leaf version {
+      type string;
+    }
+    leaf identifier {
+      type string;
+    }
+  }
+
+  container sensors {
+    list sensor {
+      key "type id";
+
+      leaf type {
+        type string;
+      }
+
+      leaf id {
+        type uint8;
+      }
+
+      leaf enabled {
+        type boolean;
+        default true;
+      }
+
+      leaf unit {
+        type string;
+      }
+
+      container quantity {
+        config false; // Client read-only.
+
+        leaf value {
+          type int64;
+        }
+      }
+
+      leaf timestamp {
+        type uint64;
+        units "seconds";
+      }
+
+      action read-sensor {
+        description "Takes one measurement with sensor.";
+      }
+    }
+  }
+
+  rpc read-sensor {
+    input {
+      leaf type {
+        type string;
+      }
+      leaf id {
+        type uint8;
+      }
+    }
+    output {
+      leaf quantity {
+        type uint32;
+      }
+    }
+  }
+}

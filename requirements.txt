@@ -1,4 +1,4 @@
 aiocoap
 cbor2
-pyang
+git+https://github.com/ltn22/pyang.git@sid-extension
 pycoreconf
