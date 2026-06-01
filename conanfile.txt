@@ -1,0 +1,10 @@
+[requires]
+openssl/3.6.2
+libcoap/4.3.3
+
+[generators]
+CMakeToolchain
+CMakeDeps
+
+[layout]
+cmake_layout
