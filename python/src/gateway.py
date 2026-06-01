@@ -15,7 +15,7 @@ message = aiocoap.Message(
 message.payload = b"Hello, User!"
 
 security_ctx = oscore.FilesystemSecurityContext(
-  "./src/context_app"
+  "./python/context_app"
 )
 
 # message_bytes = buildPacket(message)

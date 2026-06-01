@@ -7,7 +7,7 @@ from base import CoAPBase
 from packet.coap_packet import *
 
 security_ctx = oscore.FilesystemSecurityContext(
-  "./src/context_device/"
+  "./python/context_device/"
 )
 
 # Ping message
