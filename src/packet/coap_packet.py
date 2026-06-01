@@ -1,82 +1,97 @@
+import aiocoap
+import aiocoap.oscore
 from scapy.all import *
-from enum import Enum
 
-src_ip = "2001:db10::10"
-dst_ip = "2001:db8:1::10"
-# dst_ip = "2001:db8:2::10"
-src_port = 12345
-dst_port = 5683
+import logging
 
-class MsgRel:
-  CON = 0b00
-  NON = 0b01
-  ACK = 0b10
-  RST = 0b11
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-class MType:
-  PING   = 0b000_00000 # 0.00
-  GET    = 0b000_00001 # 0.01
-  POST   = 0b000_00010 # 0.02
-  PUT    = 0b000_00011 # 0.03
-  DELETE = 0b000_00100 # 0.04
-  FETCH  = 0b000_00101 # 0.05
-  PATCH  = 0b000_00110 # 0.06
-  IPATCH = 0b000_00111 # 0.07
+oscore_algorithm = aiocoap.oscore.AES_CCM_16_64_128()
+oscore_hashfun = aiocoap.oscore.hashfunctions["sha256"]
 
-  CONTENT = 0b010_00101 # 2.05
+C1_KEY = bytes.fromhex("0102030405060708090a0b0c0d0e0f10")
+C1_SALT = bytes.fromhex("9e7ca92223786340")
 
-class ResourceSelect(Enum):
-  DS_RESOURCE = [0xb1, 0x63]
+def buildPacket(
+      security_ctx: aiocoap.oscore.FilesystemSecurityContext, 
+      message: aiocoap.Message, 
+      sender_id=None, 
+      request_id: aiocoap.oscore.RequestIdentifiers|None=None
+    ) -> bytes:
+  """
+  `request_id` consists of additional data required to unprotect a protected message.
+  """
 
-def createCORECONFMessage(reliability: int, mtype: int, options=[0xb1, 0x63], payload: bytes|None=None, mid=0x1234):
+  # if not message.opt.get_option(aiocoap.OptionNumber.OSCORE):
+  #   logger.error("No OSCORE. Returning message bytes.")
+  #   return message.encode()
+
+  if sender_id is None:
+    sender_id = security_ctx.sender_id
+
+  # Split messages
+  outer_msg, inner_msg = security_ctx._split_message(message, request_id)
+
+  outer_msg.code = message.code
+  outer_msg.mid = message.mid
+  outer_msg.mtype = message.mtype
+
+  # Prepare parameters
+  partial_iv_short = None
+  partial_iv_source = None
+  nonce = None
+
+  protected = {}
+  unprotected = {}
+
+  # Get partial IV from associated data if present
+  if request_id is not None:
+    partial_iv_source, partial_iv_short = request_id.get_reusable_kid_and_piv()
   
-  coap_header = Raw(bytes([
-    0b01_00_0000 | (reliability << 4),
-    mtype,
-    mid >> 8, mid & 0xff
-  ]))
+  # If no associated data, generate partial IV. Else, reconstruct nonce from partial IV with AES_CCM
+  if partial_iv_source is None:
+    nonce, partial_iv_short = security_ctx._build_new_nonce(oscore_algorithm)
+    partial_iv_source = sender_id
+    unprotected[6] = partial_iv_short
+  else:
+    nonce = security_ctx._construct_nonce(
+      partial_iv_short, partial_iv_source, oscore_algorithm
+    )
+  
+  # Get unprotected parameters
+  unprotected[4] = sender_id
+  if message.code.is_request():
+    request_id = aiocoap.oscore.RequestIdentifiers(
+      sender_id,
+      partial_iv_short,
+      can_reuse_nonce=None,
+      request_code=outer_msg.code
+    )
+  
+  # Extract option data
+  option_data, _ = security_ctx._compress(protected, unprotected, b"")
+  outer_msg.opt.oscore = option_data
 
-  coap_options = Raw(bytes(options))
+  # TODO Compress inner message using SCHC
+  compressed_inner_msg = inner_msg
 
-  # Hexdump header and options
-  print("=" * 72)
-  print("\tCoAP Header Hexdump")
-  print("      0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   0123456789ABCDEF")
-  hexdump(coap_header)
-  print("-" * 72)
-  print("\tCoAP Options Hexdump")
-  print("      0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   0123456789ABCDEF")
-  hexdump(coap_options)
+  # Encrypt compressed inner message
+  external_aad = security_ctx._extract_external_aad(
+    outer_msg, request_id, local_is_sender=True
+  )
 
-  CoAP_Message = coap_header / coap_options
+  aad = aiocoap.oscore.SymmetricEncryptionAlgorithm._build_encrypt0_structure(
+    protected, external_aad
+  )
 
-  print("=" * 72)
-  print("\tFull CoAP Message Hexdump")
-  print("      0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   0123456789ABCDEF")
-  hexdump(CoAP_Message)
-  print("=" * 72)
+  key = security_ctx._get_sender_key(outer_msg, external_aad, compressed_inner_msg, request_id)
 
-  packet = IPv6(src=src_ip, dst=dst_ip) / UDP(sport=src_port, dport=dst_port) / CoAP_Message
+  ciphertext = security_ctx.algorithm.encrypt(compressed_inner_msg, aad, key, nonce)
+  _, protected_inner_msg = security_ctx._compress(protected, unprotected, ciphertext)
 
-  if payload:
-    # Add payload to end of packet here.
-    packet = packet / Raw(b"\xff") / Raw(payload)
+  # 
+  outer_msg.payload = protected_inner_msg
 
-  print("\tFull Packet Hexdump")
-  print("      0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   0123456789ABCDEF")
-  hexdump(packet)
-  print("=" * 72)
-
-  return packet
-
-if __name__=="__main__":
-  example_payload = bytes(b"sensors/01/t")
-
-  print("1. CoAP 0.05 FETCH Message")
-  createCORECONFMessage(MsgRel.CON, MType.FETCH, payload=example_payload)
-
-  print("\n2. CoAP 0.07 iPATCH Message")
-  createCORECONFMessage(MsgRel.NON, MType.IPATCH, payload=example_payload)
-
-  print("\n3. CoAP 2.05 Content Message")
-  createCORECONFMessage(MsgRel.ACK, MType.CONTENT, payload=example_payload)
+  # Return scapy packet
+  return outer_msg.encode(), request_id

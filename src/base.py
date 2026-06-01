@@ -1,15 +1,10 @@
 import os
 
-MODULE_NAME = "basic-sensor"
-SID_FILE = MODULE_NAME + ".sid"
-SID_PATH = os.path.join(os.path.dirname(__file__), "model", SID_FILE)
-
 class CoAPBase:
   """
-  Container with inherited static variables.
+  Container with static variables
   """
 
-  host = "localhost"
-  port = 5683
-  module_name = MODULE_NAME
-  sid_file = SID_PATH
+  DEV_IP = "::1" # Device IPv6
+  APP_IP = "::1" # Application IPv6
+  PORT = 5683 # CoAP standard port
