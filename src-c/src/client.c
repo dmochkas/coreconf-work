@@ -12,6 +12,7 @@
 /* Private variables */
 
 static uint8_t received_response = 0;
+static uint8_t dummy_buf[BUFFER_MAX];
 
 // OSCORE sequence number file and address
 static FILE *oscore_seq_num_fp = NULL;
@@ -54,7 +55,6 @@ int main() {
   );
 
   const char *resource_uri_str = "coap://[2001:660:7301:51:8b61:22c0:6d18:c74f]/hello";
-  uint8_t dummy_buf[100];
   
   coap_startup();
   coap_set_log_level(COAP_LOG_OSCORE);
@@ -88,6 +88,7 @@ int main() {
     coap_log_err("** Failed to get CoAP context.\n");
     exit(3);
   }
+  coap_context_set_block_mode(ctx, COAP_BLOCK_USE_LIBCOAP | COAP_BLOCK_SINGLE_BODY); // Required for OSCORE Echo challenge!
   coap_context_set_keepalive(ctx, 10);
 
   // Create CoAP session (with OSCORE)
@@ -124,7 +125,7 @@ int main() {
       }
     }
     
-    session = coap_new_client_session_oscore(ctx, &client, &server, COAP_PROTO_UDP, oscore_config);
+    session = coap_new_client_session_oscore3(ctx, &client, &server, COAP_PROTO_UDP, oscore_config, NULL, NULL, NULL);
   } else {
     coap_log_warn("** OSCORE is NOT supported! Aborting...\n");
     exit(4);
@@ -166,68 +167,28 @@ int main() {
   coap_show_pdu(COAP_LOG_WARN, request);
 
   // Finally send message
-  // if (coap_send(session, request) == COAP_INVALID_MID) {
-  //   coap_log_err("** Failed to send CoAP request.\n");
-  //   exit(8);
-  // }
+  coap_log_info("Sending message...\n");
+  if (coap_send(session, request) == COAP_INVALID_MID) {
+    coap_log_err("** Failed to send CoAP request.\n");
+    exit(8);
+  }
 
   // Send message and wait for response
   coap_pdu_t *response = NULL;
   unsigned wait_ms = (coap_session_get_default_leisure(session).integer_part + 1) * 1000;
 
-  coap_log_info("Sending message...\n");
-  int result = coap_send_recv(session, request, &response, wait_ms);
-  
-  if (result >= 0) {
-    coap_log_info("Response received!\n");
-    response_handler(session, request, response, coap_pdu_get_mid(request));
-
-    if (result < (int)wait_ms) {
-      wait_ms -= result;
-    } else {
-      wait_ms = 0;
-    }
-  } else {
-    switch (result) {
-    case -1:
-      coap_log_err("coap_send_recv: Invalid timeout value %u\n", wait_ms);
-      break;
-    case -2:
-      coap_log_err("coap_send_recv: Failed to transmit PDU\n");
-      break;
-    case -3:
-      coap_log_err("coap_send_recv: Critical Nack / Event occurred\n");
-      break;
-    case -4:
-      coap_log_err("coap_send_recv: Internal coap_io_process() failed\n");
-      break;
-    case -5:
-      coap_log_err("coap_send_recv: No response received within the timeout\n");
-      break;
-    case -6:
-      coap_log_err("coap_send_recv: Terminated by user\n");
-      break;
-    case -7:
-      coap_log_err("coap_send_recv: Client Mode code not enabled\n");
-      break;
-    default:
-      coap_log_err("coap_send_recv: Invalid return value %d\n", result);
-      break;
+  int res;
+  while (!received_response) {
+    res = coap_io_process(ctx, 1000);
+    if (res >= 0 && wait_ms > 0) {
+      if (res >= wait_ms) {
+        coap_log_err("** Response timeout.\n");
+        break;
+      } else {
+        wait_ms -= res;
+      }
     }
   }
-
-  // int res;
-  // while (!received_response) {
-  //   res = coap_io_process(ctx, 1000);
-  //   if (res >= 0 && wait_ms > 0) {
-  //     if (res >= wait_ms) {
-  //       coap_log_err("** Response timeout.\n");
-  //       break;
-  //     } else {
-  //       wait_ms -= res;
-  //     }
-  //   }
-  // }
 
   // Cleanup
   coap_delete_optlist(optlist);
@@ -280,6 +241,8 @@ static coap_response_t response_handler(coap_session_t *session COAP_UNUSED, con
  * @return int 
  */
 static int oscore_save_seq_num(uint64_t sender_seq_num, void *param COAP_UNUSED) {
+  coap_log_info("** Saving sequence number: %lu\n", sender_seq_num);
+
   if (oscore_seq_num_fp) {
     rewind(oscore_seq_num_fp);
     fprintf(oscore_seq_num_fp, "%lu\n", sender_seq_num);

@@ -118,7 +118,7 @@ int main() {
   }
 
   // Create listening endpoint(s)
-  coap_log_info("Getting endpoints...");
+  coap_log_info("Getting endpoints...\n");
   for (coap_addr_info_t *info = info_list; info != NULL; info = info->next) {
     coap_endpoint_t *endpoint = coap_new_endpoint(ctx, &info->addr, info->proto);
     if (!endpoint) {
@@ -199,6 +199,8 @@ static void datastore_pull_handler(coap_resource_t *resource, coap_session_t *se
  * @return int 
  */
 static int oscore_save_seq_num(uint64_t sender_seq_num, void *param COAP_UNUSED) {
+  coap_log_info("** Saving sequence number: %lu\n", sender_seq_num);
+
   if (oscore_seq_num_fp) {
     rewind(oscore_seq_num_fp);
     fprintf(oscore_seq_num_fp, "%lu\n", sender_seq_num);
