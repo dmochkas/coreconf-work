@@ -22,8 +22,8 @@ static const char *oscore_seq_save_file = OSCORE_CLIENT_SEQ_NUM_FILENAME;
 static uint8_t oscore_config_str[] = // TODO Get config from text file
   "master_secret,hex,\"0102030405060708090a0b0c0d0e0f10\"\n"
   "master_salt,hex,\"9e7ca92223786340\"\n"
-  "sender_id,hex,\"02\"\n"
-  "recipient_id,hex,\"01\"\n"
+  "sender_id,ascii,\"user1\"\n"
+  "recipient_id,ascii,\"server\"\n"
   "replay_window,integer,30\n"
   "aead_alg,integer,10\n"
   "hkdf_alg,integer,-10\n";
@@ -47,9 +47,12 @@ static int oscore_save_seq_num(uint64_t sender_seq_num, void *param COAP_UNUSED)
 int main() {
   printf(
     "OSCORECONF CLIENT\n"
-    "  Version: 0.1\n"
+    "  Version: 0.2\n"
     "  Libraries:\n"
     "  - libcoap/%s\n"
+    "  Features:\n"
+    "  - Simple GET message with server response\n"
+    "  - Protection with OSCORE and AES CCM\n"
     "\n",
     LIBCOAP_PACKAGE_VERSION
   );
@@ -57,7 +60,7 @@ int main() {
   const char *resource_uri_str = "coap://[2001:660:7301:51:8b61:22c0:6d18:c74f]/hello";
   
   coap_startup();
-  coap_set_log_level(COAP_LOG_OSCORE);
+  coap_set_log_level(LOG_INFO);
 
   // Setup client address
   coap_address_t client;
@@ -88,7 +91,7 @@ int main() {
     coap_log_err("** Failed to get CoAP context.\n");
     exit(3);
   }
-  coap_context_set_block_mode(ctx, COAP_BLOCK_USE_LIBCOAP | COAP_BLOCK_SINGLE_BODY); // Required for OSCORE Echo challenge!
+  coap_context_set_block_mode(ctx, COAP_BLOCK_USE_LIBCOAP); // Required for OSCORE Echo challenge!
   coap_context_set_keepalive(ctx, 10);
 
   // Create CoAP session (with OSCORE)

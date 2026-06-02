@@ -21,8 +21,8 @@ static const char *oscore_seq_save_file = OSCORE_SERVER_SEQ_NUM_FILENAME;
 static uint8_t oscore_config_str[] = // TODO Get config from text file
   "master_secret,hex,\"0102030405060708090a0b0c0d0e0f10\"\n"
   "master_salt,hex,\"9e7ca92223786340\"\n"
-  "sender_id,hex,\"01\"\n"
-  "recipient_id,hex,\"02\"\n"
+  "sender_id,ascii,\"server\"\n"
+  "recipient_id,ascii,\"user1\"\n"
   "replay_window,integer,30\n"
   "aead_alg,integer,10\n"
   "hkdf_alg,integer,-10\n";
@@ -52,9 +52,12 @@ int main() {
 
   printf(
     "OSCORECONF SERVER\n"
-    "  Version: 0.1\n"
+    "  Version: 0.2\n"
     "  Libraries:\n"
     "  - libcoap/%s\n"
+    "  Features:\n"
+    "  - Simple GET message with server response\n"
+    "  - Protection with OSCORE and AES CCM\n"
     "\n",
     LIBCOAP_PACKAGE_VERSION
   );
@@ -62,7 +65,7 @@ int main() {
   signal(SIGINT, handle_sigint);
   
   coap_startup();
-  coap_set_log_level(COAP_LOG_OSCORE);
+  coap_set_log_level(LOG_INFO);
 
   // Create CoAP context
   coap_context_t *ctx = coap_new_context(NULL);
