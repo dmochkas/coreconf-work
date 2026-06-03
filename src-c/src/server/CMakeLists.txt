@@ -1,4 +1,5 @@
-add_executable(server server.c)
+add_executable(server server.c
+              $<TARGET_OBJECTS:${CONFIG_LIB}>)
 
 target_include_directories(server PRIVATE
                             ${PROJECT_BINARY_DIR}

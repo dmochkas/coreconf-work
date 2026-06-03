@@ -20,9 +20,9 @@ static int oscore_save_seq_num(uint64_t sender_seq_num, void *param COAP_UNUSED)
  * @param server CoAP server address
  * @param port Server access port (CoAP default is 5683)
  * @param oscore_conf_str OSCORE configuration string (master key, master salt, etc)
- * @return coap_session_t* 
+ * @return coap_session_t* Client session
  */
-coap_session_t *setup_client_session(coap_address_t *client, coap_address_t *server, const uint16_t port, const char oscore_conf_str[]) {
+coap_session_t *setup_oscore_client_session(coap_address_t *client, coap_address_t *server, const uint16_t port, const uint8_t *oscore_conf_str) {
   
 #ifndef OSCORE_CLIENT_SEQ_NUM_FILENAME
   #error "OSCORE_CLIENT_SEQ_NUM_FILENAME is undefined!"
@@ -90,6 +90,83 @@ coap_session_t *setup_client_session(coap_address_t *client, coap_address_t *ser
   }
 
   return session;
+
+ctx_cleanup:
+  coap_free_context(ctx);
+  return NULL;
+}
+
+/**
+ * @brief Set the up oscore server object
+ * 
+ * @param oscore_conf_str OSCORE configuration string (master key, master salt, etc)
+ * @return coap_session_t* Server context
+ */
+coap_context_t *setup_oscore_server_context(coap_context_t *context, const uint8_t oscore_conf_str[]) {
+  
+#ifndef OSCORE_SERVER_SEQ_NUM_FILENAME
+  #error "OSCORE_SERVER_SEQ_NUM_FILENAME is undefined!"
+#endif
+
+  coap_context_t *ctx = NULL;
+
+  if (!context)
+    ctx = coap_new_context(NULL);
+  else
+    ctx = context;
+
+  // Check for context
+  if (!ctx) {
+    coap_log_err("%s: line %d: Failed to create context.", __FILE__, __LINE__);
+    return NULL;
+  }
+  coap_log_debug("%s: Context created.", __FILE__);
+  coap_context_set_block_mode(ctx, COAP_BLOCK_USE_LIBCOAP | COAP_BLOCK_SINGLE_BODY);
+  coap_context_set_keepalive(ctx, 10);
+
+  // Check for OSCORE
+  if (coap_oscore_is_supported()) {
+    coap_log_debug("%s: OSCORE is supported!", __FILE__);
+
+    // Get OSCORE config string as coap_str_const_t
+    coap_str_const_t *config = coap_new_str_const(oscore_conf_str, strlen(oscore_conf_str));
+    uint64_t start_seq_num = 0;
+    coap_oscore_conf_t *oscore_config;
+
+    // Try to open file
+    oscore_seq_num_fp = fopen(OSCORE_SERVER_SEQ_NUM_FILENAME, "r+");
+
+    if (oscore_seq_num_fp == NULL) { // If it doesn't exist, try to create it
+      oscore_seq_num_fp = fopen(OSCORE_SERVER_SEQ_NUM_FILENAME, "w+");
+
+      if (oscore_seq_num_fp == NULL) { // If failed to create, abort.
+        coap_log_err("%s: line %d: OSCORE save restart info file error: %s\n", __FILE__, __LINE__, OSCORE_SERVER_SEQ_NUM_FILENAME);
+        goto ctx_cleanup;
+      }
+
+      // Read first number
+      fscanf(oscore_seq_num_fp, "%ju", &start_seq_num);
+    }
+    oscore_config = coap_new_oscore_conf(*config, oscore_save_seq_num, NULL, start_seq_num);
+
+    if (!oscore_config) {
+      coap_log_err("%s: line %d: Failed to create OSCORE config.\n", __FILE__, __LINE__);
+      goto ctx_cleanup;
+    }
+
+    // Finally set OSCORE server context
+    if (!coap_context_oscore_server(ctx, oscore_config)) {
+      coap_log_err("%s: line %d: Failed to make OSCORE context.\n", __FILE__, __LINE__);
+      goto ctx_cleanup;
+    }
+
+  } else {
+    // If no OSCORE, free context and return NULL.
+    coap_log_err("%s: line %d: OSCORE is not supported!\n", __FILE__, __LINE__);
+    goto ctx_cleanup;
+  }
+
+  return ctx;
 
 ctx_cleanup:
   coap_free_context(ctx);
