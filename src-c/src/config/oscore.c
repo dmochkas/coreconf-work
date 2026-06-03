@@ -22,7 +22,7 @@ static int oscore_save_seq_num(uint64_t sender_seq_num, void *param COAP_UNUSED)
  * @param oscore_conf_str OSCORE configuration string (master key, master salt, etc)
  * @return coap_session_t* Client session
  */
-coap_session_t *setup_client_session(coap_address_t *client, coap_address_t *server, const uint16_t port, const char oscore_conf_str[]) {
+coap_session_t *setup_oscore_client_session(coap_address_t *client, coap_address_t *server, const uint16_t port, const char oscore_conf_str[]) {
   
 #ifndef OSCORE_CLIENT_SEQ_NUM_FILENAME
   #error "OSCORE_CLIENT_SEQ_NUM_FILENAME is undefined!"
