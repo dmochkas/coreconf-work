@@ -86,7 +86,7 @@ int main() {
   }
   server.addr.sin6.sin6_port = htons(COAP_PORT);
 
-  coap_session_t *session = setup_client_session(&client, &server, COAP_PORT, oscore_config_str);
+  coap_session_t *session = setup_oscore_client_session(&client, &server, COAP_PORT, oscore_config_str);
   coap_context_t *ctx = coap_session_get_context(session);
 
   // Register handlers

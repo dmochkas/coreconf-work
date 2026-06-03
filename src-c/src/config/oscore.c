@@ -102,7 +102,7 @@ ctx_cleanup:
  * @param oscore_conf_str OSCORE configuration string (master key, master salt, etc)
  * @return coap_session_t* Server context
  */
-coap_context_t *setup_oscore_server_context(coap_context_t *context, const uint8_t oscore_conf_str[]) {
+coap_context_t *setup_oscore_server_context(coap_context_t *context, const char oscore_conf_str[]) {
   
 #ifndef OSCORE_SERVER_SEQ_NUM_FILENAME
   #error "OSCORE_SERVER_SEQ_NUM_FILENAME is undefined!"
@@ -129,7 +129,7 @@ coap_context_t *setup_oscore_server_context(coap_context_t *context, const uint8
     coap_log_debug("%s: OSCORE is supported!", __FILE__);
 
     // Get OSCORE config string as coap_str_const_t
-    coap_str_const_t *config = coap_new_str_const(oscore_conf_str, strlen(oscore_conf_str));
+    coap_str_const_t *config = coap_new_str_const((const uint8_t *)oscore_conf_str, strlen(oscore_conf_str));
     uint64_t start_seq_num = 0;
     coap_oscore_conf_t *oscore_config;
 
