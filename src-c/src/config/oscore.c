@@ -22,7 +22,7 @@ static int oscore_save_seq_num(uint64_t sender_seq_num, void *param COAP_UNUSED)
  * @param oscore_conf_str OSCORE configuration string (master key, master salt, etc)
  * @return coap_session_t* 
  */
-coap_session_t *setup_client_session(coap_address_t *client, coap_address_t *server, const uint16_t port, const uint8_t *oscore_conf_str) {
+coap_session_t *setup_client_session(coap_address_t *client, coap_address_t *server, const uint16_t port, const char oscore_conf_str[]) {
   
 #ifndef OSCORE_CLIENT_SEQ_NUM_FILENAME
   #error "OSCORE_CLIENT_SEQ_NUM_FILENAME is undefined!"
@@ -35,19 +35,19 @@ coap_session_t *setup_client_session(coap_address_t *client, coap_address_t *ser
 
   // Check for context
   if (!ctx) {
-    coap_log_err("%s: line %d: Failed to create context.", __FILE__, __LINE__);
+    coap_log_err("%s: line %d: Failed to create context.\n", __FILE__, __LINE__);
     return NULL;
   }
-  coap_log_debug("%s: Context created.", __FILE__);
+  coap_log_debug("%s: Context created.\n", __FILE__);
   coap_context_set_block_mode(ctx, COAP_BLOCK_USE_LIBCOAP); // Required for OSCORE Echo challenge!
   coap_context_set_keepalive(ctx, 10);
 
   // Check for OSCORE
   if (coap_oscore_is_supported()) {
-    coap_log_debug("%s: OSCORE is supported!", __FILE__);
+    coap_log_debug("%s: OSCORE is supported!\n", __FILE__);
 
     // Get OSCORE config string as coap_str_const_t
-    coap_str_const_t config = { sizeof(oscore_conf_str), oscore_conf_str };
+    coap_str_const_t *config = coap_new_str_const((const uint8_t *)oscore_conf_str, strlen(oscore_conf_str));
     uint64_t start_seq_num = 0;
     coap_oscore_conf_t *oscore_config;
 
@@ -65,7 +65,7 @@ coap_session_t *setup_client_session(coap_address_t *client, coap_address_t *ser
       // Read first number
       fscanf(oscore_seq_num_fp, "%ju", &start_seq_num);
     }
-    oscore_config = coap_new_oscore_conf(config, oscore_save_seq_num, NULL, start_seq_num);
+    oscore_config = coap_new_oscore_conf(*config, oscore_save_seq_num, NULL, start_seq_num);
 
     if (!oscore_config) {
       coap_log_err("%s: line %d: Failed to create OSCORE config.\n", __FILE__, __LINE__);

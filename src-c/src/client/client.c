@@ -20,7 +20,7 @@ static FILE *oscore_seq_num_fp = NULL;
 static const char *oscore_seq_save_file = OSCORE_CLIENT_SEQ_NUM_FILENAME;
 
 // OSCORE configurations
-static uint8_t oscore_config_str[] = // TODO Get config from text file
+const char oscore_config_str[] = // TODO Get config from text file
   "master_secret,hex,\"0102030405060708090a0b0c0d0e0f10\"\n"
   "master_salt,hex,\"9e7ca92223786340\"\n"
   "sender_id,ascii,\"user1\"\n"
@@ -61,7 +61,7 @@ int main() {
   const char *resource_uri_str = "coap://[2001:660:7301:51:8b61:22c0:6d18:c74f]/hello";
   
   coap_startup();
-  coap_set_log_level(LOG_INFO);
+  coap_set_log_level(LOG_DEBUG);
 
   // Setup client address
   coap_address_t client;
