@@ -1,7 +1,7 @@
 set(INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 set(SOURCE_CODE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-set(COMMON_LIB "common")
+set(CONFIG_LIB "config")
 set(HELPERS_LIB "helpers")
 
 add_subdirectory(${INCLUDE_DIR})

@@ -1,5 +1,6 @@
 add_executable(client client.c
-              $<TARGET_OBJECTS:${HELPERS_LIB}>)
+              $<TARGET_OBJECTS:${HELPERS_LIB}>
+              $<TARGET_OBJECTS:${CONFIG_LIB}>)
 
 target_include_directories(client PRIVATE
                             ${PROJECT_BINARY_DIR}

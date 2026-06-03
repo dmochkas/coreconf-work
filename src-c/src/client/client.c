@@ -7,6 +7,7 @@
 #include <coap3/coap.h>
 
 #include "common/definitions.h"
+#include "config/oscore.h"
 #include "helpers/resolve.h"
 
 /* Private variables */
@@ -85,60 +86,8 @@ int main() {
   }
   server.addr.sin6.sin6_port = htons(COAP_PORT);
 
-  // Create CoAP context
-  coap_context_t *ctx = coap_new_context(NULL);
-  if (!ctx) {
-    coap_log_err("** Failed to get CoAP context.\n");
-    exit(3);
-  }
-  coap_context_set_block_mode(ctx, COAP_BLOCK_USE_LIBCOAP); // Required for OSCORE Echo challenge!
-  coap_context_set_keepalive(ctx, 10);
-
-  // Create CoAP session (with OSCORE)
-  coap_session_t *session = NULL;
-  if (coap_oscore_is_supported()) {
-    coap_log_warn("** OSCORE is supported!\n");
-
-    coap_str_const_t *config_str = coap_make_str_const(oscore_config_str);
-    uint64_t start_seq_num = 0;
-    coap_oscore_conf_t *oscore_config;
-
-    if (oscore_seq_save_file) {
-      // Try to open file
-      oscore_seq_num_fp = fopen(oscore_seq_save_file, "r+");
-
-      if (oscore_seq_num_fp == NULL) { // If it doesn't exist, try to create it
-        oscore_seq_num_fp = fopen(oscore_seq_save_file, "w+");
-
-        if (oscore_seq_num_fp == NULL) { // If failed to create, abort.
-          coap_log_err("** OSCORE save restart info file error: %s\nAborting!\n", oscore_seq_save_file);
-          exit(4);
-        }
-
-        fscanf(oscore_seq_num_fp, "%ju", &start_seq_num);
-      }
-      oscore_config = coap_new_oscore_conf(*config_str, oscore_save_seq_num, NULL, start_seq_num);
-
-      if (!oscore_config) {
-        coap_free_context(ctx);
-
-        coap_log_err("** Failed to create OSCORE config.\n");
-
-        exit(5);
-      }
-    }
-    
-    session = coap_new_client_session_oscore3(ctx, &client, &server, COAP_PROTO_UDP, oscore_config, NULL, NULL, NULL);
-  } else {
-    coap_log_warn("** OSCORE is NOT supported! Aborting...\n");
-    exit(4);
-  }
-  
-  if (!session) {
-    coap_log_err("** Failed to create CoAP session object.\n");
-    coap_free_context(ctx);
-    exit(4);
-  }
+  coap_session_t *session = setup_client_session(&client, &server, COAP_PORT, oscore_config_str);
+  coap_context_t *ctx = coap_session_get_context(session);
 
   // Register handlers
   coap_register_nack_handler(ctx, nack_handler);
