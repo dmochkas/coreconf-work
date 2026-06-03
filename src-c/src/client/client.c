@@ -6,7 +6,7 @@
 #include <coap3/libcoap.h>
 #include <coap3/coap.h>
 
-#include "definitions.h"
+#include "common/definitions.h"
 #include "helpers/resolve.h"
 
 /* Private variables */
