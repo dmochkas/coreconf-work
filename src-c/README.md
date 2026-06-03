@@ -4,7 +4,7 @@ In order to use this version of the project, you need the git submodules as well
 
 > Using the Visual Studio Code CMake Tools extension is recommended, if you use this IDE.
 
-Execute the following commands in this file form the root directory of the repository.
+Execute the following commands in this file from the root directory of the repository.
 
 ## Initializing and updating git submodules
 
