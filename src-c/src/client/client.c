@@ -61,7 +61,7 @@ int main() {
   const char *resource_uri_str = "coap://[2001:660:7301:51:8b61:22c0:6d18:c74f]/hello";
   
   coap_startup();
-  coap_set_log_level(LOG_DEBUG);
+  coap_set_log_level(LOG_INFO);
 
   // Setup client address
   coap_address_t client;
