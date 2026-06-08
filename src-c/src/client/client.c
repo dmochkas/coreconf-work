@@ -23,8 +23,8 @@ static const char *oscore_seq_save_file = OSCORE_CLIENT_SEQ_NUM_FILENAME;
 const char oscore_config_str[] = // TODO Get config from text file
   "master_secret,hex,\"0102030405060708090a0b0c0d0e0f10\"\n"
   "master_salt,hex,\"9e7ca92223786340\"\n"
-  "sender_id,ascii,\"user1\"\n"
-  "recipient_id,ascii,\"server\"\n"
+  "sender_id,hex,\"01\"\n"
+  "recipient_id,hex,\"00\"\n"
   "replay_window,integer,30\n"
   "aead_alg,integer,10\n"
   "hkdf_alg,integer,-10\n";
@@ -58,7 +58,7 @@ int main() {
     LIBCOAP_PACKAGE_VERSION
   );
 
-  const char *resource_uri_str = "coap://[2001:660:7301:51:8b61:22c0:6d18:c74f]/hello";
+  const char *resource_uri_str = "coap://[" COAP_SERVER_IP "]/hello";
   
   coap_startup();
   coap_set_log_level(LOG_INFO);
@@ -69,8 +69,7 @@ int main() {
   memset(&client.addr.sin6, 0, sizeof(client.addr.sin6)); // Setting IPv6 socket in client
   client.addr.sa.sa_family       = AF_INET6;
   client.addr.sin6.sin6_family   = AF_INET6;
-  client.addr.sin6.sin6_port     = htons(COAP_PORT);
-  client.addr.sin6.sin6_addr     = in6addr_any;
+  client.addr.sin6.sin6_addr     = in6addr_loopback;
   client.addr.sin6.sin6_flowinfo = 0;
   client.addr.sin6.sin6_scope_id = 0;
 

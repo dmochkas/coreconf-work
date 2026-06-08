@@ -19,11 +19,11 @@ static uint8_t running = 1;
 // static const char *oscore_seq_save_file = OSCORE_SERVER_SEQ_NUM_FILENAME;
 
 // OSCORE configurations
-const uint8_t oscore_config_str[] = // TODO Get config from text file
+const char oscore_config_str[] = // TODO Get config from text file
   "master_secret,hex,\"0102030405060708090a0b0c0d0e0f10\"\n"
   "master_salt,hex,\"9e7ca92223786340\"\n"
-  "sender_id,ascii,\"server\"\n"
-  "recipient_id,ascii,\"user1\"\n"
+  "sender_id,hex,\"00\"\n"
+  "recipient_id,hex,\"01\"\n"
   "replay_window,integer,30\n"
   "aead_alg,integer,10\n"
   "hkdf_alg,integer,-10\n";
