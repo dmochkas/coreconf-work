@@ -1,3 +1,6 @@
 [submodule "thirdparty/libcoap"]
 	path = thirdparty/libcoap
 	url = https://github.com/obgm/libcoap.git
+[submodule "thirdparty/uoscore-uedhoc"]
+	path = thirdparty/uoscore-uedhoc
+	url = https://github.com/eriptic/uoscore-uedhoc.git
