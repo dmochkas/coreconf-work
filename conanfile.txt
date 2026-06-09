@@ -1,6 +1,6 @@
 [requires]
 openssl/3.6.2
-libcoap/4.3.3
+cunit/2.1-3
 
 [generators]
 CMakeToolchain
