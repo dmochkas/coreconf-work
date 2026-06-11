@@ -13,6 +13,9 @@
 /* Private variables */
 
 static uint8_t running = 1;
+static const char temperature[] = "20C";
+static uint8_t battery_level = 80;
+static uint8_t pos_x = 20, pos_y = 35;
 
 // OSCORE sequence number file and address
 // static FILE *oscore_seq_num_fp = NULL;
@@ -36,7 +39,12 @@ static void handle_sigint(int signum COAP_UNUSED) {
 
 /* Resource handler prototypes */
 
-static void datastore_pull_handler(coap_resource_t *resource,
+static void datastore_get_handler(coap_resource_t *resource,
+                                    coap_session_t *session, 
+                                    const coap_pdu_t *request, 
+                                    const coap_string_t *query COAP_UNUSED,
+                                    coap_pdu_t *response);
+static void datastore_post_handler(coap_resource_t *resource,
                                     coap_session_t *session, 
                                     const coap_pdu_t *request, 
                                     const coap_string_t *query COAP_UNUSED,
@@ -49,7 +57,6 @@ int main() {
 
   printf(
     "OSCORECONF SERVER\n"
-    "  Version: 0.2\n"
     "  Libraries:\n"
     "  - libcoap/%s\n"
     "  Features:\n"
@@ -62,7 +69,7 @@ int main() {
   signal(SIGINT, handle_sigint);
   
   coap_startup();
-  coap_set_log_level(LOG_INFO);
+  coap_set_log_level(COAP_LOG_INFO);
 
   // Start OSCORE server
   coap_log_info("Creating new context...\n");
@@ -92,10 +99,10 @@ int main() {
   }
 
   // Create resource
-  const char *datastore_resource_uri = "hello";
+  const char *datastore_resource_uri = "c";
   coap_resource_t *datastore_resource = coap_resource_init(coap_make_str_const(datastore_resource_uri), 0);
-  coap_register_handler(datastore_resource, COAP_REQUEST_GET, datastore_pull_handler);
-  coap_register_handler(datastore_resource, COAP_REQUEST_FETCH, datastore_pull_handler);
+  coap_register_handler(datastore_resource, COAP_REQUEST_GET, datastore_get_handler);
+  coap_register_handler(datastore_resource, COAP_REQUEST_POST, datastore_post_handler);
   coap_add_resource(ctx, datastore_resource);
 
   // Handle any libcoap I/O requirements
@@ -126,7 +133,63 @@ int main() {
  * @param COAP_UNUSED 
  * @param response 
  */
-static void datastore_pull_handler(coap_resource_t *resource, coap_session_t *session, const coap_pdu_t *request, const coap_string_t *query COAP_UNUSED, coap_pdu_t *response) {
+static void datastore_get_handler(coap_resource_t *resource, coap_session_t *session, const coap_pdu_t *request, const coap_string_t *query COAP_UNUSED, coap_pdu_t *response) {
+
+  coap_opt_t *block_opt;
+  coap_opt_iterator_t opt_iter;
+  
+  size_t buf_len;
+  const uint8_t *buf_data;
+  size_t buf_offset;
+  size_t buf_total;
+
+  coap_pdu_code_t rcv_code = coap_pdu_get_code(request);
+  coap_pdu_type_t rcv_type = coap_pdu_get_type(request);
+  coap_bin_const_t token = coap_pdu_get_token(request);
+
+  coap_log_info("** process incoming request %d.%02d request:\n",
+                  COAP_RESPONSE_CLASS(rcv_code), rcv_code & 0x1F);
+  coap_show_pdu(COAP_LOG_INFO, request);
+
+  // Possible queries: "temp", "bat", "pos"
+  if (!coap_get_data(request, &buf_len, &buf_data)) {
+    coap_log_warn(__FILE__ ": line %d: Failed to get data from request.", __LINE__);
+  }
+  char data[BUFFER_MAX] = { 0 };
+  memcpy(data, buf_data, buf_len);
+
+  uint8_t buf[1] = { 0 };
+  coap_add_option(response, COAP_OPTION_CONTENT_FORMAT, 1, buf);
+
+  if (strcmp(data, "temp") == 0) {
+    // Requesting temperature
+    coap_add_data(response, strlen(temperature), temperature);
+  } else if (strcmp(data, "bat") == 0) {
+    // Requesting battery level
+    uint8_t temp_buf[1] = { battery_level };
+    coap_add_data(response, 1, temp_buf);
+  } else if (strcmp(data, "pos") == 0) {
+    // Requesting position
+    uint8_t temp_buf[2] = { pos_x, pos_y };
+    coap_add_data(response, 2, temp_buf);
+  } else {
+    coap_log_err(__FILE__ ": line %d: Bad payload.\n", __LINE__);
+  }
+  coap_log_info("** Requesting \"%s\" (len %lu)\n", data, buf_len);
+
+  coap_pdu_set_code(response, COAP_RESPONSE_CODE_VALID);
+}
+
+/**
+ * @brief 
+ * 
+ * @param resource 
+ * @param session 
+ * @param request 
+ * @param COAP_UNUSED 
+ * @param response 
+ */
+static void datastore_post_handler(coap_resource_t *resource, coap_session_t *session, const coap_pdu_t *request, const coap_string_t *query COAP_UNUSED, coap_pdu_t *response) {
 
   coap_opt_t *block_opt;
   coap_opt_iterator_t opt_iter;
