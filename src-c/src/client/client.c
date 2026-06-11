@@ -74,7 +74,7 @@ int main() {
   memset(&client.addr.sin6, 0, sizeof(client.addr.sin6)); // Setting IPv6 socket in client
   client.addr.sa.sa_family       = AF_INET6;
   client.addr.sin6.sin6_family   = AF_INET6;
-  client.addr.sin6.sin6_addr     = in6addr_loopback;
+  client.addr.sin6.sin6_addr     = in6addr_any;
   client.addr.sin6.sin6_flowinfo = 0;
   client.addr.sin6.sin6_scope_id = 0;
 
