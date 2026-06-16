@@ -6,6 +6,9 @@ set(PROJ_SERVER ON)
 
   # libcoap configurations
 
+# Disable docs
+set(ENABLE_DOCS OFF)
+
 # Disable IPv4, TCP
 set(ENABLE_TCP OFF)
 set(ENABLE_IPV4 OFF)
