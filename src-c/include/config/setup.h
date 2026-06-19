@@ -11,16 +11,16 @@
 #endif
 
 coap_session_t *setup_client_session(
-  coap_address_t *client, 
-  coap_address_t *server, 
-  const uint16_t port
 #ifdef ENABLE_OSCORE
-  , const char oscore_conf_str[]
+  coap_address_t *client, coap_address_t *server, const uint16_t port, const char oscore_conf_str[]
+#else
+  coap_address_t *client, coap_address_t *server, const uint16_t port
 #endif
 );
 coap_context_t *setup_server_context(
-  coap_context_t *ctx
 #ifdef ENABLE_OSCORE
-  , const char oscore_conf_str[]
+  coap_context_t *ctx, const char oscore_conf_str[]
+#else
+  coap_context_t *ctx
 #endif
 );
