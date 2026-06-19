@@ -1,5 +1,5 @@
 # CONFIG_LIB
-add_library(${CONFIG_LIB} OBJECT "${SOURCE_CODE_DIR}/config/oscore.c")
+add_library(${CONFIG_LIB} OBJECT "${SOURCE_CODE_DIR}/config/setup.c")
 target_include_directories(${CONFIG_LIB} PRIVATE "${INCLUDE_DIR}/config/")
 target_link_libraries(${CONFIG_LIB} PUBLIC libcoap::coap-3)
 
