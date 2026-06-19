@@ -1,10 +1,11 @@
-#include "oscore.h"
+#include "setup.h"
 
+#ifdef ENABLE_OSCORE
 static FILE *oscore_seq_num_fp = NULL;
 
 static int oscore_save_seq_num(uint64_t sender_seq_num, void *param COAP_UNUSED) {
   coap_log_debug("*** Saving OSCORE sequente number (%lu)", sender_seq_num);
-
+  
   if (oscore_seq_num_fp) {
     rewind(oscore_seq_num_fp);
     fprintf(oscore_seq_num_fp, "%lu\n", sender_seq_num);
@@ -12,6 +13,7 @@ static int oscore_save_seq_num(uint64_t sender_seq_num, void *param COAP_UNUSED)
   }
   return 1;
 }
+#endif
 
 /**
  * @brief Set the up client session object
@@ -19,12 +21,18 @@ static int oscore_save_seq_num(uint64_t sender_seq_num, void *param COAP_UNUSED)
  * @param client CoAP client address or NULL
  * @param server CoAP server address
  * @param port Server access port (CoAP default is 5683)
- * @param oscore_conf_str OSCORE configuration string (master key, master salt, etc)
+ * @param oscore_conf_str OSCORE configuration string (master key, master salt, etc). Unused if ENABLE_OSCORE is undefined
  * @return coap_session_t* Client session
  */
-coap_session_t *setup_oscore_client_session(coap_address_t *client, coap_address_t *server, const uint16_t port, const char oscore_conf_str[]) {
+coap_session_t *setup_client_session(
+#ifdef ENABLE_OSCORE
+    coap_address_t *client, coap_address_t *server, const uint16_t port, const char oscore_conf_str[]
+#else
+    coap_address_t *client, coap_address_t *server, const uint16_t port
+#endif
+  ) {
   
-#ifndef OSCORE_CLIENT_SEQ_NUM_FILENAME
+#if defined(ENABLE_OSCORE) && !defined(OSCORE_CLIENT_SEQ_NUM_FILENAME)
   #error "OSCORE_CLIENT_SEQ_NUM_FILENAME is undefined!"
 #endif
   
@@ -43,7 +51,8 @@ coap_session_t *setup_oscore_client_session(coap_address_t *client, coap_address
   coap_context_set_keepalive(ctx, 10);
 
   // Check for OSCORE
-  if (coap_oscore_is_supported()) {
+#ifdef ENABLE_OSCORE
+  if (coap_oscore_is_supported() && oscore_conf_str != NULL) {
     coap_log_debug("%s: OSCORE is supported!\n", __FILE__);
 
     // Get OSCORE config string as coap_str_const_t
@@ -78,10 +87,15 @@ coap_session_t *setup_oscore_client_session(coap_address_t *client, coap_address
     );
 
   } else {
-    // If no OSCORE, free context and return NULL.
-    coap_log_err("%s: line %d: OSCORE is not supported!\n", __FILE__, __LINE__);
+    // If no OSCORE or no OSCORE configurations, cleanup.
+    coap_log_err("%s: line %d: OSCORE is not supported or missing config!\n", __FILE__, __LINE__);
     goto ctx_cleanup;
   }
+#else
+  session = coap_new_client_session3(
+    ctx, client, server, COAP_PROTO_UDP, NULL, NULL, NULL
+  );
+#endif
 
   // If no session was created, free context and return NULL.
   if (!session) {
@@ -99,17 +113,24 @@ ctx_cleanup:
 /**
  * @brief Set the up oscore server object
  * 
- * @param oscore_conf_str OSCORE configuration string (master key, master salt, etc)
+ * @param oscore_conf_str OSCORE configuration string (master key, master salt, etc). Unused if ENABLE_OSCORE is undefined.
  * @return coap_session_t* Server context
  */
-coap_context_t *setup_oscore_server_context(coap_context_t *context, const char oscore_conf_str[]) {
+coap_context_t *setup_server_context(
+#ifdef ENABLE_OSCORE
+    coap_context_t *context, const char oscore_conf_str[]
+#else
+    coap_context_t *context
+#endif
+  ) {
   
-#ifndef OSCORE_SERVER_SEQ_NUM_FILENAME
+#if defined(ENABLE_OSCORE) && !defined(OSCORE_SERVER_SEQ_NUM_FILENAME)
   #error "OSCORE_SERVER_SEQ_NUM_FILENAME is undefined!"
 #endif
 
   coap_context_t *ctx = NULL;
 
+  // If no context was given, create new context.
   if (!context)
     ctx = coap_new_context(NULL);
   else
@@ -125,7 +146,8 @@ coap_context_t *setup_oscore_server_context(coap_context_t *context, const char 
   coap_context_set_keepalive(ctx, 10);
 
   // Check for OSCORE
-  if (coap_oscore_is_supported()) {
+#ifdef ENABLE_OSCORE
+  if (coap_oscore_is_supported() && oscore_conf_str != NULL) {
     coap_log_debug("%s: OSCORE is supported!", __FILE__);
 
     // Get OSCORE config string as coap_str_const_t
@@ -161,14 +183,17 @@ coap_context_t *setup_oscore_server_context(coap_context_t *context, const char 
     }
 
   } else {
-    // If no OSCORE, free context and return NULL.
-    coap_log_err("%s: line %d: OSCORE is not supported!\n", __FILE__, __LINE__);
+    // If no OSCORE or no OSCORE configurations, cleanup.
+    coap_log_err("%s: line %d: OSCORE is not supported or missing config!\n", __FILE__, __LINE__);
     goto ctx_cleanup;
   }
+#endif
 
   return ctx;
 
+#ifdef ENABLE_OSCORE
 ctx_cleanup:
   coap_free_context(ctx);
   return NULL;
+#endif
 }

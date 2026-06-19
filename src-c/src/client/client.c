@@ -7,7 +7,7 @@
 #include <coap3/coap.h>
 
 #include "common/definitions.h"
-#include "config/oscore.h"
+#include "config/setup.h"
 #include "helpers/resolve.h"
 
 /* Private variables */
@@ -15,10 +15,7 @@
 static uint8_t received_response = 0;
 static uint8_t dummy_buf[BUFFER_MAX];
 
-// OSCORE sequence number file and address
-static FILE *oscore_seq_num_fp = NULL;
-static const char *oscore_seq_save_file = OSCORE_CLIENT_SEQ_NUM_FILENAME;
-
+#ifdef ENABLE_OSCORE
 // OSCORE configurations
 const char oscore_config_str[] = // TODO Get config from text file
   "master_secret,hex,\"0102030405060708090a0b0c0d0e0f10\"\n"
@@ -28,6 +25,7 @@ const char oscore_config_str[] = // TODO Get config from text file
   "replay_window,integer,30\n"
   "aead_alg,integer,10\n"
   "hkdf_alg,integer,-10\n";
+#endif
 
 /* Message handler prototypes */
 
@@ -42,7 +40,6 @@ static coap_response_t response_handler(coap_session_t *session COAP_UNUSED,
 
 /* Private function prototypes */
 
-static int oscore_save_seq_num(uint64_t sender_seq_num, void *param COAP_UNUSED);
 static int send_request(coap_session_t *session, coap_context_t *ctx, coap_pdu_t *pdu, coap_pdu_t **response);
 
 /* Main function */
@@ -90,7 +87,13 @@ int main() {
   }
   server.addr.sin6.sin6_port = htons(COAP_PORT);
 
-  coap_session_t *session = setup_oscore_client_session(&client, &server, COAP_PORT, oscore_config_str);
+  coap_session_t *session = setup_client_session(
+#ifdef ENABLE_OSCORE
+    &client, &server, COAP_PORT, oscore_config_str
+#else
+    &client, &server, COAP_PORT
+#endif
+  );
   coap_context_t *ctx = coap_session_get_context(session);
 
   // Register handlers
@@ -250,24 +253,6 @@ static coap_response_t response_handler(coap_session_t *session COAP_UNUSED, con
 
   // received_response = 1;
   return COAP_RESPONSE_OK;
-}
-
-/**
- * @brief 
- * 
- * @param sender_seq_num 
- * @param COAP_UNUSED 
- * @return int 
- */
-static int oscore_save_seq_num(uint64_t sender_seq_num, void *param COAP_UNUSED) {
-  coap_log_info("** Saving sequence number: %lu\n", sender_seq_num);
-
-  if (oscore_seq_num_fp) {
-    rewind(oscore_seq_num_fp);
-    fprintf(oscore_seq_num_fp, "%lu\n", sender_seq_num);
-    fflush(oscore_seq_num_fp);
-  }
-  return 1;
 }
 
 /**

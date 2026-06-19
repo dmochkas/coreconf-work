@@ -7,7 +7,7 @@
 #include <coap3/coap.h>
 
 #include "common/definitions.h"
-#include "config/oscore.h"
+#include "config/setup.h"
 #include "helpers/resolve.h"
 
 /* Private variables */
@@ -17,10 +17,7 @@ static const char temperature[] = "20C";
 static uint8_t battery_level = 80;
 static uint8_t pos_x = 20, pos_y = 35;
 
-// OSCORE sequence number file and address
-// static FILE *oscore_seq_num_fp = NULL;
-// static const char *oscore_seq_save_file = OSCORE_SERVER_SEQ_NUM_FILENAME;
-
+#ifdef ENABLE_OSCORE
 // OSCORE configurations
 const char oscore_config_str[] = // TODO Get config from text file
   "master_secret,hex,\"0102030405060708090a0b0c0d0e0f10\"\n"
@@ -30,6 +27,7 @@ const char oscore_config_str[] = // TODO Get config from text file
   "replay_window,integer,30\n"
   "aead_alg,integer,10\n"
   "hkdf_alg,integer,-10\n";
+#endif
 
 /* Private functions */
 
@@ -79,7 +77,11 @@ int main() {
   coap_log_info("Resolving address...\n");
   coap_addr_info_t *info_list = coap_resolve_address_info(server_address, 0, 0, 0, 0, AF_INET6, scheme_hint_bits, COAP_RESOLVE_TYPE_LOCAL);
 
-  setup_oscore_server_context(ctx, oscore_config_str);
+#ifdef ENABLE_OSCORE
+  setup_server_context(ctx, oscore_config_str);
+#else
+  setup_server_context(ctx);
+#endif
 
   // Create listening endpoint(s)
   coap_log_info("Getting endpoints...\n");
