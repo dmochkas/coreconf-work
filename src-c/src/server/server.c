@@ -17,6 +17,10 @@ static const char temperature[] = "20C";
 static uint8_t battery_level = 80;
 static uint8_t pos_x = 20, pos_y = 35;
 
+// Redefines for SCHC AL testing
+#define COAP_SERVER_IP "::1" /* Put your server device's IP when you test. */
+#define COAP_PORT 5684
+
 #ifdef ENABLE_OSCORE
 // OSCORE configurations
 const char oscore_config_str[] = // TODO Get config from text file
@@ -75,7 +79,7 @@ int main() {
 
   uint32_t scheme_hint_bits = coap_get_available_scheme_hint_bits(0, 0, COAP_PROTO_NONE);
   coap_log_info("Resolving address...\n");
-  coap_addr_info_t *info_list = coap_resolve_address_info(server_address, 0, 0, 0, 0, AF_INET6, scheme_hint_bits, COAP_RESOLVE_TYPE_LOCAL);
+  coap_addr_info_t *info_list = coap_resolve_address_info(server_address, COAP_PORT, COAP_PORT, COAP_PORT, COAP_PORT, AF_INET6, scheme_hint_bits, COAP_RESOLVE_TYPE_LOCAL);
 
 #ifdef ENABLE_OSCORE
   setup_server_context(ctx, oscore_config_str);

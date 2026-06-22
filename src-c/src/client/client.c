@@ -15,6 +15,10 @@
 static uint8_t received_response = 0;
 static uint8_t dummy_buf[BUFFER_MAX];
 
+// Redefines for SCHC AL testing
+#define COAP_SERVER_IP "::1" /* Put your server device's IP when you test. */
+#define COAP_PORT 5683
+
 #ifdef ENABLE_OSCORE
 // OSCORE configurations
 const char oscore_config_str[] = // TODO Get config from text file
@@ -63,7 +67,7 @@ int main() {
   const char *resource_uri_str = "coap://[" COAP_SERVER_IP "]/c";
   
   coap_startup();
-  coap_set_log_level(COAP_LOG_INFO);
+  coap_set_log_level(COAP_LOG_DEBUG);
 
   // Setup client address
   coap_address_t client;
@@ -227,7 +231,7 @@ int main() {
 
 static void nack_handler(coap_session_t *session COAP_UNUSED, const coap_pdu_t *sent, const coap_nack_reason_t reason, const coap_mid_t mid COAP_UNUSED) {
   // TODO Implement
-  coap_log_err("NACK event. Reason: %d", reason);
+  coap_log_err("NACK event. Reason: %d\n", reason);
 }
 
 /**
