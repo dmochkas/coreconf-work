@@ -16,8 +16,8 @@ static uint8_t received_response = 0;
 static uint8_t dummy_buf[BUFFER_MAX];
 
 // Redefines for SCHC AL testing
-#define COAP_SERVER_IP "::1" /* Put your server device's IP when you test. */
-#define COAP_PORT 5683
+#define COAP_SERVER_IP "2001:db8::9999" /* Put your server device's IP when you test. */
+#define COAP_PORT "5683"
 
 #ifdef ENABLE_OSCORE
 // OSCORE configurations
@@ -64,7 +64,7 @@ int main() {
     LIBCOAP_PACKAGE_VERSION
   );
 
-  const char *resource_uri_str = "coap://[" COAP_SERVER_IP "]/c";
+  const char *resource_uri_str = "coap://[" COAP_SERVER_IP "]:" COAP_PORT "/c";
   
   coap_startup();
   coap_set_log_level(COAP_LOG_DEBUG);
@@ -89,7 +89,7 @@ int main() {
     coap_log_err(__FILE__ ": line %d: Failed to resolve server address.\n", __LINE__);
     exit(1);
   }
-  server.addr.sin6.sin6_port = htons(COAP_PORT);
+  server.addr.sin6.sin6_port = htons(atoi(COAP_PORT));
 
   coap_session_t *session = setup_client_session(
 #ifdef ENABLE_OSCORE
@@ -127,95 +127,34 @@ int main() {
     coap_log_err(__FILE__ ": line %d: Failed to create options.\n", __LINE__);
     exit(1);
   }
-  if (coap_add_optlist_pdu(request, &optlist) != 1) {
-    coap_log_err(__FILE__ ": line %d: Failed to add options to request.\n", __LINE__);
-    exit(1);
-  }
-
-  memset(data, 0, sizeof(data));
-  if (coap_add_option(request, COAP_OPTION_ACCEPT, 1, data) == 0) {
-    coap_log_err(__FILE__ ": line %d: Failed to add Accept option to request.\n", __LINE__);
-    exit(1);
-  }
-  
-  if (coap_add_data(request, strlen("temp"), "temp") != 1) {
-    coap_log_err(__FILE__ ": line %d: Failed to add data to request.\n", __LINE__);
-    exit(1);
-  }
+  // if (coap_add_optlist_pdu(request, &optlist) != 1) {
+  //   coap_log_err(__FILE__ ": line %d: Failed to add options to request.\n", __LINE__);
+  //   exit(1);
+  // }
 
   coap_show_pdu(COAP_LOG_INFO, request);
-  send_request(session, ctx, request, &response);
-  coap_show_pdu(COAP_LOG_INFO, response);
-
-  coap_get_data(response, &payload_len, &payload);
-  memset(data, 0, sizeof(data));
-  memcpy(data, payload, payload_len);
-  coap_log_info("Temperature: %s\n", data);
-
-  printf("\n");
-  
-  // Battery level request
-  request = coap_pdu_init(COAP_MESSAGE_CON, COAP_REQUEST_CODE_GET, coap_new_message_id(session), coap_session_max_pdu_size(session));
-  if (!request) {
-    coap_log_err(__FILE__ ": line %d: Failed to create CoAP request.\n", __LINE__);
-    exit(1);
-  }
-
-  // Create options list and add to message
-  if (coap_add_optlist_pdu(request, &optlist) != 1) {
-    coap_log_err(__FILE__ ": line %d: Failed to add options to request.\n", __LINE__);
-    exit(1);
-  }
-
-  memset(data, 0, sizeof(data));
-  if (coap_add_option(request, COAP_OPTION_ACCEPT, 1, data) == 0) {
-    coap_log_err(__FILE__ ": line %d: Failed to add Accept option to request.\n", __LINE__);
-    exit(1);
+  // Finally send message
+  coap_log_info("Sending message...\n");
+  if (coap_send(session, request) == COAP_INVALID_MID) {
+    coap_log_err("** Failed to send CoAP request.\n");
+    exit(8);
   }
   
-  if (coap_add_data(request, strlen("bat"), "bat") != 1) {
-    coap_log_err(__FILE__ ": line %d: Failed to add data to request.\n", __LINE__);
+  // Send message and wait for response
+  unsigned wait_ms = (coap_session_get_default_leisure(session).integer_part + 1) * 1000;
+
+  int res;
+  while (!received_response) {
+    res = coap_io_process(ctx, 1000);
+    if (res >= 0 && wait_ms > 0) {
+      if (res >= wait_ms) {
+        coap_log_err("** Response timeout.\n");
+        break;
+      } else {
+        wait_ms -= res;
+      }
+    }
   }
-
-  // Send message
-  coap_show_pdu(COAP_LOG_INFO, request);
-  send_request(session, ctx, request, &response);
-  coap_show_pdu(COAP_LOG_INFO, response);
-
-  coap_get_data(response, &payload_len, &payload);
-  coap_log_info("Battery level: %d\n", payload[0]);
-
-  printf("\n");
-
-  // Position request
-  request = coap_pdu_init(COAP_MESSAGE_CON, COAP_REQUEST_CODE_GET, coap_new_message_id(session), coap_session_max_pdu_size(session));
-  if (!request) {
-    coap_log_err(__FILE__ ": line %d: Failed to create CoAP request.\n", __LINE__);
-    exit(1);
-  }
-
-  // Create options list and add to message
-  if (coap_add_optlist_pdu(request, &optlist) != 1) {
-    coap_log_err(__FILE__ ": line %d: Failed to add options to request.\n", __LINE__);
-    exit(1);
-  }
-
-  memset(data, 0, sizeof(data));
-  if (coap_add_option(request, COAP_OPTION_ACCEPT, 1, data) == 0) {
-    coap_log_err(__FILE__ ": line %d: Failed to add Accept option to request.\n", __LINE__);
-    exit(1);
-  }
-  
-  if (coap_add_data(request, strlen("pos"), "pos") != 1) {
-    coap_log_err(__FILE__ ": line %d: Failed to add data to request.\n", __LINE__);
-  }
-
-  coap_show_pdu(COAP_LOG_INFO, request);
-  send_request(session, ctx, request, &response);
-  coap_show_pdu(COAP_LOG_INFO, response);
-
-  coap_get_data(response, &payload_len, &payload);
-  coap_log_info("Position:  X=%d Y=%d\n", payload[0], payload[1]);
 
   // Cleanup
   coap_delete_optlist(optlist);
